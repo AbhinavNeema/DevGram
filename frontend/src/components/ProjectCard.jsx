@@ -1,0 +1,244 @@
+import axios from "axios";
+import { useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { timeAgo } from "../utils/timeAgo";
+import { renderMentions } from "../utils/renderMentions";
+
+const ProjectCard = ({ project }) => {
+  const navigate = useNavigate();
+  const token = localStorage.getItem("token");
+  const userId = JSON.parse(atob(token.split(".")[1])).id;
+
+  const isOwner =
+    project.owner?._id === userId || project.owner === userId;
+
+  const [likesCount, setLikesCount] = useState(project.likes.length);
+  const [liked, setLiked] = useState(project.likes.includes(userId));
+  const [comments, setComments] = useState(project.comments || []);
+  const [text, setText] = useState("");
+  const [views, setViews] = useState(project.views || 0);
+  const [expanded, setExpanded] = useState(false);
+  const [showAllComments, setShowAllComments] = useState(false);
+  const [activeImage, setActiveImage] = useState(null);
+  const [viewed, setViewed] = useState(false);
+
+  /* ---------- VIEW ---------- */
+  const addView = async () => {
+    if (viewed) return;
+    try {
+      const res = await axios.post(
+        `http://localhost:5001/api/projects/${project._id}/view`,
+        {},
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      setViews(res.data.views);
+      setViewed(true);
+    } catch {}
+  };
+
+  /* ---------- LIKE ---------- */
+  const handleLike = async () => {
+    addView();
+    const res = await axios.put(
+      `http://localhost:5001/api/projects/${project._id}/like`,
+      {},
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    setLiked(res.data.liked);
+    setLikesCount(res.data.likesCount);
+  };
+
+  /* ---------- COMMENT ---------- */
+  const addComment = async () => {
+    if (!text.trim()) return;
+    addView();
+
+    const res = await axios.post(
+      `http://localhost:5001/api/projects/${project._id}/comments`,
+      { text },
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+
+    setComments([...comments, res.data]);
+    setText("");
+  };
+
+  const deleteComment = async (commentId) => {
+    await axios.delete(
+      `http://localhost:5001/api/projects/${project._id}/comments/${commentId}`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    setComments(comments.filter(c => c._id !== commentId));
+  };
+
+  /* ---------- DELETE ---------- */
+  const deleteProject = async () => {
+    if (!window.confirm("Delete this project?")) return;
+    await axios.delete(
+      `http://localhost:5001/api/projects/${project._id}`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    window.location.reload();
+  };
+
+  return (
+    <div className="bg-white border rounded-lg mb-5">
+
+      {/* HEADER */}
+      <div className="flex gap-3 px-4 pt-4">
+        <div className="w-10 h-10 rounded-full bg-[#e7f3ff] flex items-center justify-center font-semibold text-[#0a66c2]">
+          {project.owner?.name?.[0] || "U"}
+        </div>
+
+        <div className="flex-1">
+          <Link
+            to={`/user/${project.owner?._id}`}
+            className="text-sm font-semibold hover:underline"
+          >
+            {project.owner?.name}
+          </Link>
+          <p className="text-xs text-gray-500">
+            Posted · {timeAgo(project.createdAt)}
+          </p>
+        </div>
+
+        {isOwner && (
+          <div className="text-xs flex gap-3">
+            <button onClick={() => navigate(`/projects/${project._id}/edit`)}>
+              Edit
+            </button>
+            <button onClick={deleteProject} className="text-red-500">
+              Delete
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* CONTENT */}
+      <div className="px-4 mt-3">
+        <h3 className="font-semibold">{project.title}</h3>
+
+        <p className="text-sm text-gray-700 mt-1">
+          {expanded || project.description.length <= 180
+            ? renderMentions(project.description)
+            : renderMentions(project.description.slice(0, 180) + "...")}
+
+          {project.description.length > 180 && (
+            <button
+              onClick={() => {
+                setExpanded(!expanded);
+                addView();
+              }}
+              className="ml-1 text-blue-600 font-medium"
+            >
+              {expanded ? "Read less" : "Read more"}
+            </button>
+          )}
+        </p>
+      </div>
+
+      {/* IMAGES */}
+      {project.images?.length > 0 && (
+        <div className="px-4 mt-3 grid grid-cols-2 gap-2">
+          {project.images.map((img, i) => (
+            <img
+              key={i}
+              src={img.url}
+              alt=""
+              className="h-48 w-full object-cover rounded cursor-pointer"
+              onClick={() => {
+                addView();
+                setActiveImage(img.url);
+              }}
+            />
+          ))}
+        </div>
+      )}
+
+      
+      <div className="px-4 mt-3 flex gap-2 flex-wrap">
+        {project.techStack.map(tag => (
+          <Link
+            key={tag}
+            to={`/?tag=${encodeURIComponent(tag)}`}
+            className="text-xs text-blue-600 hover:underline"
+          >
+            #{tag}
+          </Link>
+        ))}
+      </div>
+
+      
+      <div className="px-4 mt-4 flex gap-6 text-sm text-gray-600">
+        <button onClick={handleLike}>❤️ {likesCount}</button>
+        <span>💬 {comments.length}</span>
+        <span>👀 {views}</span>
+      </div>
+
+      
+      <div className="border-t px-4 py-3 text-sm">
+        {!showAllComments && comments.length > 0 && (
+          <>
+            <div>
+              <b>{comments[0].author?.name}</b>{" "}
+              {renderMentions(comments[0].text)}
+            </div>
+            {comments.length > 1 && (
+              <button
+                onClick={() => setShowAllComments(true)}
+                className="text-xs text-blue-600"
+              >
+                View all {comments.length} comments
+              </button>
+            )}
+          </>
+        )}
+
+        {showAllComments &&
+          comments.map(c => (
+            <div key={c._id} className="flex justify-between">
+              <span>
+                <b>{c.author?.name}</b> {renderMentions(c.text)}
+              </span>
+              {String(c.author?._id) === String(userId) && (
+                <button
+                  onClick={() => deleteComment(c._id)}
+                  className="text-red-500 text-xs"
+                >
+                  Delete
+                </button>
+              )}
+            </div>
+          ))}
+
+        <div className="flex gap-2 mt-3">
+          <input
+            value={text}
+            onChange={e => setText(e.target.value)}
+            placeholder="Add a comment… @username"
+            className="flex-1 border rounded px-3 py-1 text-sm"
+          />
+          <button onClick={addComment} className="text-blue-600 font-medium">
+            Post
+          </button>
+        </div>
+      </div>
+
+      
+      {activeImage && (
+        <div
+          className="fixed inset-0 bg-black/80 flex items-center justify-center"
+          onClick={() => setActiveImage(null)}
+        >
+          <img
+            src={activeImage}
+            className="max-w-[90%] max-h-[90%] rounded"
+            alt=""
+          />
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default ProjectCard;
