@@ -4,15 +4,28 @@ const jwt = require("jsonwebtoken");
 
 exports.register = async (req, res) => {
   try {
-    const { name, email, password } = req.body;
+    const { name, email, password, username } = req.body;
 
-    if (!name || !email || !password) {
+    if (!name || !email || !password || !username) {
       return res.status(400).json({ message: "All fields required" });
     }
 
-    const existingUser = await User.findOne({ email });
-    if (existingUser) {
-      return res.status(400).json({ message: "User already exists" });
+    const normalizedUsername = username;
+    if (!username) {
+      return res.status(400).json({ message: "Username required" });
+    }
+
+    if (!/^[a-z0-9_.]+$/.test(username)) {
+      return res.status(400).json({ message: "Invalid username format" });
+    }
+    const usernameExists = await User.findOne({ username: normalizedUsername });
+    if (usernameExists) {
+      return res.status(409).json({ message: "Username already taken" });
+    }
+
+    const emailExists = await User.findOne({ email });
+    if (emailExists) {
+      return res.status(409).json({ message: "Email already registered" });
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
@@ -20,8 +33,8 @@ exports.register = async (req, res) => {
     const user = await User.create({
       name,
       email,
-      password: hashedPassword,
-      username: email.split("@")[0],
+      username: normalizedUsername,
+      password: hashedPassword
     });
 
     const token = jwt.sign(
@@ -35,12 +48,14 @@ exports.register = async (req, res) => {
       user: {
         id: user._id,
         name: user.name,
-        email: user.email,
-        username: user.username,
-      },
+        username: user.username
+      }
     });
   } catch (err) {
-    console.error(err);
+    if (err.code === 11000) {
+      return res.status(409).json({ message: "Username or email already exists" });
+    }
+
     res.status(500).json({ message: "Server error" });
   }
 };
@@ -87,5 +102,25 @@ exports.me = async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "Server error" });
+  }
+};
+
+exports.checkUsername = async (req, res) => {
+  try {
+    const rawUsername = req.params.username;
+    if (!rawUsername) {
+      return res.status(400).json({ available: false });
+    }
+
+    const username = rawUsername.toLowerCase();
+
+    if (!/^[a-z0-9_.]+$/.test(username)) {
+      return res.status(400).json({ available: false });
+    }
+
+    const exists = await User.findOne({ username });
+    res.json({ available: !exists });
+  } catch {
+    res.status(500).json({ available: false });
   }
 };
