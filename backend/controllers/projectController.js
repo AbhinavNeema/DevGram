@@ -1,16 +1,14 @@
 const Project = require("../models/Project");
 const cloudinary = require("../config/cloudinary");
 const ALLOWED_TAGS = require("../constants/tags");
+const User = require("../models/User");
 
 exports.createProject = async (req, res) => {
   try {
-    const { title, description, githubLink, liveDemoLink } = req.body;
+    const { title, description, githubLink, liveDemoLink, mentions = "[]" } = req.body;
 
     const techStack = JSON.parse(req.body.techStack || "[]");
-
-    const filteredTags = techStack.filter(tag =>
-      ALLOWED_TAGS.includes(tag)
-    );
+    const parsedMentions = JSON.parse(mentions);
 
     const images = [];
 
@@ -18,44 +16,39 @@ exports.createProject = async (req, res) => {
       for (const file of req.files) {
         images.push({
           url: file.path,
-          public_id: file.filename
+          public_id: file.filename,
         });
       }
     }
-
+    
     const project = await Project.create({
       title,
       description,
-      techStack: filteredTags,
+      techStack,
       githubLink,
       liveDemoLink,
       images,
       owner: req.userId,
-      views: 0,
-      viewedBy: [],
+      mentions: parsedMentions,
     });
 
     res.status(201).json(project);
-  } catch (error) {
-    console.error("Create Project Error:", error);
+  } catch (err) {
     res.status(500).json({ message: "Server error" });
   }
 };
 
 exports.getProjects = async (req, res) => {
   try {
-    const { tag } = req.query;
-
-    const filter = tag ? { techStack: tag } : {};
-
-    const projects = await Project.find(filter)
+    const projects = await Project.find()
       .populate("owner", "name username")
       .populate("comments.author", "name username")
+      .populate("comments.mentions", "username")
+      .populate("mentions", "username")
       .sort({ createdAt: -1 });
 
     res.json(projects);
-  } catch (error) {
-    console.error("Get Projects Error:", error);
+  } catch {
     res.status(500).json({ message: "Server error" });
   }
 };
@@ -100,20 +93,26 @@ exports.likeProject = async (req, res) => {
 
 exports.addComment = async (req, res) => {
   try {
+    const { text, mentions = [] } = req.body;
+
     const project = await Project.findById(req.params.id);
     if (!project) return res.status(404).json({ message: "Project not found" });
 
     project.comments.push({
-      text: req.body.text,
+      text,
       author: req.userId,
+      mentions
     });
 
     await project.save();
-    await project.populate("comments.author", "name username");
 
-    res.status(201).json(project.comments.at(-1));
-  } catch (error) {
-    console.error("Add Comment Error:", error);
+    const updated = await Project.findById(project._id)
+      .populate("comments.author", "name username")
+      .populate("comments.mentions", "username");
+
+    res.json(updated.comments.at(-1));
+  } catch (err) {
+    console.error(err);
     res.status(500).json({ message: "Server error" });
   }
 };
@@ -149,25 +148,32 @@ exports.updateProject = async (req, res) => {
     if (project.owner.toString() !== req.userId)
       return res.status(403).json({ message: "Not authorized" });
 
+    project.title = req.body.title ?? project.title;
+    project.description = req.body.description ?? project.description;
+    project.githubLink = req.body.githubLink ?? project.githubLink;
+    project.liveDemoLink = req.body.liveDemoLink ?? project.liveDemoLink;
+
+    if (req.body.mentions) {
+      project.mentions = req.body.mentions;
+    }
+
     if (req.body.techStack) {
       project.techStack = req.body.techStack.filter(tag =>
         ALLOWED_TAGS.includes(tag)
       );
     }
 
-    project.title = req.body.title ?? project.title;
-    project.description = req.body.description ?? project.description;
-    project.githubLink = req.body.githubLink ?? project.githubLink;
-    project.liveDemoLink = req.body.liveDemoLink ?? project.liveDemoLink;
-
     await project.save();
-    res.json(project);
+
+    const updated = await Project.findById(project._id)
+      .populate("owner", "name username")
+      .populate("mentions", "username");
+
+    res.json(updated);
   } catch (err) {
-    console.error("Update Project Error:", err);
     res.status(500).json({ message: "Server error" });
   }
 };
-
 exports.deleteProject = async (req, res) => {
   try {
     const project = await Project.findById(req.params.id);
@@ -215,7 +221,8 @@ exports.getProjectById = async (req, res) => {
   try {
     const project = await Project.findById(req.params.id)
       .populate("owner", "name")
-      .populate("comments.author", "name");
+      .populate("comments.author", "name")
+      .populate("mentions", "username");
 
     if (!project) {
       return res.status(404).json({ message: "Project not found" });

@@ -24,16 +24,22 @@ const projectSchema = new mongoose.Schema(
     ],
 
     comments: [
+  {
+    text: { type: String, required: true },
+    author: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+    },
+    mentions: [
       {
-        text: { type: String, required: true },
-        author: {
-          type: mongoose.Schema.Types.ObjectId,
-          ref: "User",
-          required: true,
-        },
-        createdAt: { type: Date, default: Date.now },
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
       },
     ],
+    createdAt: { type: Date, default: Date.now },
+  },
+],
 
     images: [
       {

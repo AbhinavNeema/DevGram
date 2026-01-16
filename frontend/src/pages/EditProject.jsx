@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import api from "../api/axios";
 import TAGS from "../constants/tags";
+import MentionInput from "../components/MentionInput";
 
 const EditProject = () => {
   const { id } = useParams();
@@ -9,71 +10,63 @@ const EditProject = () => {
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
+  const [mentions, setMentions] = useState([]);
 
   const [techStack, setTechStack] = useState([]);
   const [tagSearch, setTagSearch] = useState("");
 
   const [github, setGithub] = useState("");
   const [demo, setDemo] = useState("");
-
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     const fetchProject = async () => {
-      try {
-        const res = await api.get(`/projects/${id}`);
-        const p = res.data;
+      const res = await api.get(`/projects/${id}`);
+      const p = res.data;
 
-        setTitle(p.title);
-        setDescription(p.description);
-        setTechStack(p.techStack || []);
-        setGithub(p.githubLink || "");
-        setDemo(p.liveDemoLink || "");
-      } catch (err) {
-        console.error("Fetch project error", err);
-      }
+      setTitle(p.title);
+      setDescription(p.description);
+      setMentions(p.mentions || []);
+      setTechStack(p.techStack || []);
+      setGithub(p.githubLink || "");
+      setDemo(p.liveDemoLink || "");
     };
 
     fetchProject();
   }, [id]);
 
-  const addTag = (tag) => {
+  const addTag = tag => {
     if (techStack.includes(tag)) return;
     if (techStack.length >= 8) return;
     setTechStack([...techStack, tag]);
     setTagSearch("");
   };
 
-  const removeTag = (tag) => {
+  const removeTag = tag => {
     setTechStack(techStack.filter(t => t !== tag));
   };
 
-  const filteredTags = TAGS.filter(tag =>
-    tag.toLowerCase().includes(tagSearch.toLowerCase()) &&
-    !techStack.includes(tag)
+  const filteredTags = TAGS.filter(
+    tag =>
+      tag.toLowerCase().includes(tagSearch.toLowerCase()) &&
+      !techStack.includes(tag)
   );
 
-const saveChanges = async () => {
-    if (!title || !description) {
-      return alert("Title & description required");
-    }
+  const saveChanges = async () => {
+    if (!title || !description) return;
 
     setLoading(true);
-    try {
-      await api.put(`/projects/${id}`, {
-        title,
-        description,
-        techStack,
-        githubLink: github,
-        liveDemoLink: demo,
-      });
 
-      navigate("/");
-    } catch (err) {
-      console.error("Update project failed", err);
-    } finally {
-      setLoading(false);
-    }
+    await api.put(`/projects/${id}`, {
+      title,
+      description,
+      mentions: mentions.map(m => m._id),
+      techStack,
+      githubLink: github,
+      liveDemoLink: demo,
+    });
+
+    navigate("/");
   };
 
   return (
@@ -87,13 +80,14 @@ const saveChanges = async () => {
         onChange={e => setTitle(e.target.value)}
       />
 
-      <textarea
-        className="w-full border rounded-md px-3 py-2 mb-3 text-sm"
-        placeholder="Describe your project"
-        rows={4}
+      <MentionInput
         value={description}
-        onChange={e => setDescription(e.target.value)}
+        onChange={setDescription}
+        onMentionsChange={setMentions}
+        initialMentions={mentions}
+        rows={4}
       />
+
       <div className="mb-4 relative">
         <label className="text-sm font-medium text-gray-700">
           Tech Stack (max 8)
@@ -106,12 +100,7 @@ const saveChanges = async () => {
               className="bg-[#eef3f8] px-3 py-1 rounded-full text-xs flex items-center gap-1"
             >
               {tag}
-              <button
-                onClick={() => removeTag(tag)}
-                className="text-gray-500 hover:text-red-500"
-              >
-                ×
-              </button>
+              <button onClick={() => removeTag(tag)}>×</button>
             </span>
           ))}
         </div>
@@ -119,7 +108,7 @@ const saveChanges = async () => {
         <input
           value={tagSearch}
           onChange={e => setTagSearch(e.target.value)}
-          placeholder="Search tech (React, ML, Docker...)"
+          placeholder="Search tech"
           className="w-full border rounded-md px-3 py-2 mt-2 text-sm"
         />
 

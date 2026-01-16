@@ -2,7 +2,7 @@ import { useState } from "react";
 import api from "../api/axios";
 import { useNavigate } from "react-router-dom";
 import TAGS from "../constants/tags";
-
+import MentionInput from "../components/MentionInput";
 const CreateProject = () => {
   const navigate = useNavigate();
 
@@ -17,7 +17,7 @@ const CreateProject = () => {
 
   const [images, setImages] = useState([]);
   const [previews, setPreviews] = useState([]);
-
+  const [mentions, setMentions] = useState([]);
   const [loading, setLoading] = useState(false);
 
   const addTag = (tag) => {
@@ -43,31 +43,32 @@ const CreateProject = () => {
   };
 
   const submit = async () => {
-    if (!title || !description) return alert("Title & description required");
+  if (!title || !description) return alert("Title & description required");
 
-    setLoading(true);
+  setLoading(true);
 
-    try {
-      const formData = new FormData();
-      formData.append("title", title);
-      formData.append("description", description);
-      formData.append("techStack", JSON.stringify(techStack));
-      if (github) formData.append("githubLink", github);
-      if (demo) formData.append("liveDemoLink", demo);
+  try {
+    const formData = new FormData();
+    formData.append("title", title);
+    formData.append("description", description);
+    formData.append("mentions", JSON.stringify(mentions));
+    formData.append("techStack", JSON.stringify(techStack));
+    if (github) formData.append("githubLink", github);
+    if (demo) formData.append("liveDemoLink", demo);
 
-      images.forEach(img => formData.append("images", img));
+    images.forEach(img => formData.append("images", img));
 
-      await api.post("/projects", formData, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
+    await api.post("/projects", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
 
-      navigate("/");
-    } catch (err) {
-      console.error("Create project failed", err);
-    } finally {
-      setLoading(false);
-    }
-  };
+    navigate("/");
+  } catch (err) {
+    console.error("Create project failed", err);
+  } finally {
+    setLoading(false);
+  }
+};
 
   return (
     <div className="max-w-xl mx-auto bg-white border rounded-lg p-6">
@@ -81,12 +82,12 @@ const CreateProject = () => {
         onChange={e => setTitle(e.target.value)}
       />
 
-      <textarea
-        className="w-full border rounded-md px-3 py-2 mb-3 text-sm"
+      <MentionInput
+        value={description}
+        onChange={setDescription}
+        onMentionsChange={setMentions}
         placeholder="Describe your project"
         rows={4}
-        value={description}
-        onChange={e => setDescription(e.target.value)}
       />
 
       
