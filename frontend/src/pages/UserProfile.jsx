@@ -2,12 +2,16 @@ import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import api from "../api/axios";
 import ProjectCard from "../components/ProjectCard";
+import BlogCard from "../components/BlogCard";
 
 const UserProfile = () => {
   const { id, username } = useParams();
   const navigate = useNavigate();
 
   const [data, setData] = useState(null);
+  const [blogs, setBlogs] = useState([]);
+  const [activeTab, setActiveTab] = useState("projects");
+
   const [isFollowing, setIsFollowing] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
 
@@ -25,6 +29,7 @@ const UserProfile = () => {
     }
   } catch {}
 
+  /* ================= FETCH PROFILE (ONCE) ================= */
   useEffect(() => {
     const fetchProfile = async () => {
       try {
@@ -53,6 +58,15 @@ const UserProfile = () => {
     fetchProfile();
   }, [id, username, currentUserId]);
 
+  /* ================= FETCH BLOGS (ONLY WHEN TAB = BLOGS) ================= */
+  useEffect(() => {
+    if (activeTab !== "blogs" || !data?.user?._id) return;
+
+    api.get(`/blogs/user/${data.user._id}`).then(res => {
+      setBlogs(res.data);
+    });
+  }, [activeTab, data]);
+
   if (!data) {
     return (
       <div className="max-w-5xl mx-auto px-4 animate-pulse">
@@ -62,28 +76,20 @@ const UserProfile = () => {
   }
 
   const { user, projects } = data;
-
   const isOwner = String(currentUserId) === String(user._id);
 
+  /* ================= FOLLOW ================= */
   const toggleFollow = async () => {
-    try {
-      const res = await api.put(`/users/${user._id}/follow`);
-
-      setIsFollowing(res.data.following);
-
-      setData(prev => ({
-        ...prev,
-        user: {
-          ...prev.user,
-          followers: res.data.followers,
-        },
-      }));
-    } catch (err) {
-      console.error("Follow error:", err);
-    }
+    const res = await api.put(`/users/${user._id}/follow`);
+    setIsFollowing(res.data.following);
+    setData(prev => ({
+      ...prev,
+      user: { ...prev.user, followers: res.data.followers },
+    }));
   };
 
-  const addSkill = (e) => {
+  /* ================= SKILLS ================= */
+  const addSkill = e => {
     if (e.key === "Enter" && skillInput.trim()) {
       e.preventDefault();
       if (!skills.includes(skillInput.trim())) {
@@ -93,62 +99,45 @@ const UserProfile = () => {
     }
   };
 
-  const removeSkill = (skill) => {
+  const removeSkill = skill =>
     setSkills(skills.filter(s => s !== skill));
-  };
 
+  /* ================= SAVE PROFILE ================= */
   const saveProfile = async () => {
-    try {
-      await api.put(`/users/${user._id}`, {
-        bio,
-        about,
-        techStack: skills,
-      });
+    await api.put(`/users/${user._id}`, {
+      bio,
+      about,
+      techStack: skills,
+    });
 
-      setData(prev => ({
-        ...prev,
-        user: {
-          ...prev.user,
-          bio,
-          about,
-          techStack: skills,
-        },
-      }));
+    setData(prev => ({
+      ...prev,
+      user: { ...prev.user, bio, about, techStack: skills },
+    }));
 
-      setIsEditing(false);
-    } catch (err) {
-      console.error("Save profile failed:", err);
-    }
+    setIsEditing(false);
   };
 
   return (
     <div className="max-w-5xl mx-auto px-4">
 
+      {/* ================= PROFILE CARD ================= */}
       <div className="bg-white border rounded-xl p-6 flex gap-6 items-center">
-
         <div className="w-20 h-20 rounded-full bg-gray-200 flex items-center justify-center text-2xl font-bold text-[#0a66c2]">
           {user.name?.[0]}
         </div>
 
         <div className="flex-1">
-          <h2 className="text-xl font-semibold text-[#191919]">
-            {user.name}
-          </h2>
-
-          <p className="text-sm text-[#666] mt-1">
-            @{user.username}
-          </p>
+          <h2 className="text-xl font-semibold">{user.name}</h2>
+          <p className="text-sm text-gray-500">@{user.username}</p>
 
           {!isEditing ? (
-            <p className="text-sm text-gray-600 mt-2">
-              {user.bio || "Add a bio"}
-            </p>
+            <p className="text-sm mt-2">{user.bio || "Add a bio"}</p>
           ) : (
             <input
               value={bio}
               onChange={e => setBio(e.target.value)}
               className="border px-2 py-1 rounded text-sm w-full mt-2"
-              placeholder="Short bio"
             />
           )}
 
@@ -160,26 +149,16 @@ const UserProfile = () => {
         </div>
 
         {isOwner ? (
-          <button
-            onClick={() => setIsEditing(!isEditing)}
-            className="text-sm text-[#0a66c2] hover:underline"
-          >
+          <button onClick={() => setIsEditing(!isEditing)} className="text-blue-600">
             {isEditing ? "Cancel" : "Edit Profile"}
           </button>
         ) : (
-          <button
-            onClick={toggleFollow}
-            className={`px-4 py-1.5 rounded-full text-sm border ${
-              isFollowing
-                ? "text-gray-600 border-gray-300"
-                : "text-[#0a66c2] border-[#0a66c2]"
-            }`}
-          >
+          <button onClick={toggleFollow} className="border px-4 py-1 rounded-full">
             {isFollowing ? "Following" : "Follow"}
           </button>
         )}
       </div>
-
+              {/* ================= ABOUT ================= */}
       <div className="bg-white border rounded-xl p-6 mt-5">
         <h3 className="font-semibold mb-2">About</h3>
 
@@ -197,16 +176,14 @@ const UserProfile = () => {
         )}
       </div>
 
+      {/* ================= SKILLS ================= */}
       <div className="bg-white border rounded-xl p-6 mt-5">
         <h3 className="font-semibold mb-3">Skills</h3>
 
         {!isEditing ? (
           <div className="flex flex-wrap gap-2">
             {skills.length ? skills.map(skill => (
-              <span
-                key={skill}
-                className="bg-gray-100 px-3 py-1 rounded-full text-sm"
-              >
+              <span key={skill} className="bg-gray-100 px-3 py-1 rounded-full text-sm">
                 {skill}
               </span>
             )) : (
@@ -217,17 +194,9 @@ const UserProfile = () => {
           <>
             <div className="flex flex-wrap gap-2 mb-3">
               {skills.map(skill => (
-                <span
-                  key={skill}
-                  className="bg-gray-200 px-3 py-1 rounded-full text-sm flex items-center gap-1"
-                >
+                <span key={skill} className="bg-gray-200 px-3 py-1 rounded-full text-sm flex items-center gap-1">
                   {skill}
-                  <button
-                    onClick={() => removeSkill(skill)}
-                    className="text-gray-500 hover:text-red-500"
-                  >
-                    ×
-                  </button>
+                  <button onClick={() => removeSkill(skill)}>×</button>
                 </span>
               ))}
             </div>
@@ -245,35 +214,48 @@ const UserProfile = () => {
 
       {isEditing && (
         <div className="mt-4 flex justify-end">
-          <button
-            onClick={saveProfile}
-            className="bg-[#0a66c2] text-white px-4 py-2 rounded text-sm"
-          >
+          <button onClick={saveProfile} className="bg-[#0a66c2] text-white px-4 py-2 rounded text-sm">
             Save Changes
           </button>
         </div>
       )}
 
-      <div className="mt-5 space-y-4">
-        {projects.length === 0 ? (
-          <div className="bg-white border rounded-lg p-8 text-center">
-            <p className="text-sm font-medium text-[#191919]">
-              No projects yet
-            </p>
+      {/* ================= TABS ================= */}
+      <div className="flex gap-6 border-b mt-6 text-sm font-medium">
+        <button
+          onClick={() => setActiveTab("projects")}
+          className={activeTab === "projects" ? "border-b-2 border-blue-600" : ""}
+        >
+          Projects
+        </button>
+        <button
+          onClick={() => setActiveTab("blogs")}
+          className={activeTab === "blogs" ? "border-b-2 border-blue-600" : ""}
+        >
+          Blogs
+        </button>
+      </div>
 
-            {isOwner && (
-              <button
-                onClick={() => navigate("/create")}
-                className="mt-3 text-sm text-[#0a66c2] hover:underline"
-              >
-                Create your first project
-              </button>
-            )}
-          </div>
-        ) : (
-          projects.map(p => (
-            <ProjectCard key={p._id} project={p} />
-          ))
+      {/* ================= TAB CONTENT ================= */}
+      <div className="mt-5 space-y-4">
+        {activeTab === "projects" && (
+          projects.length === 0 ? (
+            <p className="text-sm text-gray-500">No projects yet</p>
+          ) : (
+            projects.map(p => (
+              <ProjectCard key={p._id} project={p} />
+            ))
+          )
+        )}
+
+        {activeTab === "blogs" && (
+          blogs.length === 0 ? (
+            <p className="text-sm text-gray-500">No blogs written yet</p>
+          ) : (
+            blogs.map(b => (
+              <BlogCard key={b._id} blog={b} />
+            ))
+          )
         )}
       </div>
     </div>
