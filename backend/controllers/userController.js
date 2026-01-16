@@ -68,7 +68,10 @@ exports.getUserProfile = async (req, res) => {
     const projects = await Project.find({ owner: userId })
       .populate("owner", "name username")
       .populate("comments.author", "name username")
+      .populate("comments.mentions", "username")
+      .populate("mentions", "username")
       .sort({ createdAt: -1 });
+      
 
     const blogs = await Blog.find({ author: userId })
       .populate("author", "name username")

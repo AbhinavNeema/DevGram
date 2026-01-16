@@ -220,9 +220,10 @@ exports.addView = async (req, res) => {
 exports.getProjectById = async (req, res) => {
   try {
     const project = await Project.findById(req.params.id)
-      .populate("owner", "name")
-      .populate("comments.author", "name")
-      .populate("mentions", "username");
+      .populate("owner", "name username")
+      .populate("comments.author", "name username")
+      .populate("comments.mentions", "username")
+      .populate("mentions", "username")
 
     if (!project) {
       return res.status(404).json({ message: "Project not found" });

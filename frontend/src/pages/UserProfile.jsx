@@ -3,6 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import api from "../api/axios";
 import ProjectCard from "../components/ProjectCard";
 import BlogCard from "../components/BlogCard";
+import { useRef } from "react";
 
 const UserProfile = () => {
   const { id, username } = useParams();
@@ -19,6 +20,9 @@ const UserProfile = () => {
   const [about, setAbout] = useState("");
   const [skills, setSkills] = useState([]);
   const [skillInput, setSkillInput] = useState("");
+
+  const [toast, setToast] = useState("");
+  const toastTimeout = useRef(null);
 
   const token = localStorage.getItem("token");
   let currentUserId = null;
@@ -150,21 +154,36 @@ const UserProfile = () => {
           </div>
         </div>
 
-        {isOwner ? (
+        <div className="flex gap-3 items-center">
           <button
-            onClick={() => setIsEditing(!isEditing)}
-            className="text-blue-600"
+            onClick={async () => {
+              const link = `${window.location.origin}/user/${user._id}`;
+              await navigator.clipboard.writeText(link);
+              setToast("Profile link copied!");
+              clearTimeout(toastTimeout.current);
+              toastTimeout.current = setTimeout(() => setToast(""), 1500);
+            }}
+            className="text-sm text-blue-600"
           >
-            {isEditing ? "Cancel" : "Edit Profile"}
+            Share
           </button>
-        ) : (
-          <button
-            onClick={toggleFollow}
-            className="border px-4 py-1 rounded-full"
-          >
-            {isFollowing ? "Following" : "Follow"}
-          </button>
-        )}
+
+          {isOwner ? (
+            <button
+              onClick={() => setIsEditing(!isEditing)}
+              className="text-sm text-blue-600"
+            >
+              {isEditing ? "Cancel" : "Edit Profile"}
+            </button>
+          ) : (
+            <button
+              onClick={toggleFollow}
+              className="border px-4 py-1 rounded-full text-sm"
+            >
+              {isFollowing ? "Following" : "Follow"}
+            </button>
+          )}
+        </div>
       </div>
 
       {/* ================= ABOUT ================= */}
@@ -285,6 +304,11 @@ const UserProfile = () => {
           )
         )}
       </div>
+      {toast && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-black text-white px-4 py-2 rounded-full text-sm shadow-lg z-50">
+          {toast}
+        </div>
+      )}
     </div>
   );
 };

@@ -62,9 +62,34 @@ exports.getBlogs = async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 };
+exports.addView = async (req, res) => {
+  const blog = await Blog.findById(req.params.id);
+  if (!blog) return res.status(404).json({ message: "Blog not found" });
+
+  const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+
+  const alreadyViewed = blog.viewedBy.some(
+    v =>
+      v.user.toString() === req.userId &&
+      v.date === today
+  );
+
+  if (!alreadyViewed) {
+    blog.views += 1;
+    blog.viewedBy.push({
+      user: req.userId,
+      date: today
+    });
+    await blog.save();
+  }
+
+  res.json({ views: blog.views });
+};
 exports.getBlogsByUser = async (req, res) => {
   const blogs = await Blog.find({ author: req.params.id })
     .populate("author", "name username")
+    .populate("comments.author", "name username")
+    .populate("comments.mentions", "username")
     .populate("mentions", "username")
     .sort({ createdAt: -1 });
 
@@ -76,7 +101,8 @@ exports.getBlogById = async (req, res) => {
     const blog = await Blog.findById(req.params.id)
       .populate("author", "name username")
       .populate("comments.author", "name username")
-      .populate("mentions", "username");
+      .populate("comments.mentions", "username")
+      .populate("mentions", "username")
 
     if (!blog) {
       return res.status(404).json({ message: "Blog not found" });
