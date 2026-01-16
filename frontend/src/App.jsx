@@ -11,7 +11,8 @@ import EditProject from "./pages/EditProject";
 import SearchPage from "./pages/SearchPage";
 import MainLayout from "./layouts/MainLayout";
 import Trending from "./pages/Trending";
-
+import ProjectPage from "./pages/ProjectPage";
+import BlogPage from "./pages/BlogPage";
 function App() {
   return (
     <AuthProvider>
@@ -41,7 +42,22 @@ function App() {
               </ProtectedRoute>
             }
           />
+          <Route path="/blog/:id" element={
+            <ProtectedRoute>
+                <MainLayout>
+                  <BlogPage />
+                </MainLayout>
+              </ProtectedRoute>
+          }/>
 
+      
+          <Route path="/project/:id" element={
+            <ProtectedRoute>
+                <MainLayout>
+                  <ProjectPage />
+                </MainLayout>
+              </ProtectedRoute>
+          }/>
           <Route
             path="/user/:id"
             element={

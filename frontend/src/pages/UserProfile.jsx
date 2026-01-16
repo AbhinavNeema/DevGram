@@ -29,7 +29,7 @@ const UserProfile = () => {
     }
   } catch {}
 
-  /* ================= FETCH PROFILE (ONCE) ================= */
+  /* ================= FETCH PROFILE ================= */
   useEffect(() => {
     const fetchProfile = async () => {
       try {
@@ -58,13 +58,14 @@ const UserProfile = () => {
     fetchProfile();
   }, [id, username, currentUserId]);
 
-  /* ================= FETCH BLOGS (ONLY WHEN TAB = BLOGS) ================= */
+  /* ================= FETCH BLOGS (FIXED) ================= */
   useEffect(() => {
     if (activeTab !== "blogs" || !data?.user?._id) return;
 
-    api.get(`/blogs/user/${data.user._id}`).then(res => {
-      setBlogs(res.data);
-    });
+    api
+      .get(`/blogs/user/${data.user._id}`)
+      .then(res => setBlogs(res.data))
+      .catch(err => console.error("Blogs fetch error:", err));
   }, [activeTab, data]);
 
   if (!data) {
@@ -82,6 +83,7 @@ const UserProfile = () => {
   const toggleFollow = async () => {
     const res = await api.put(`/users/${user._id}/follow`);
     setIsFollowing(res.data.following);
+
     setData(prev => ({
       ...prev,
       user: { ...prev.user, followers: res.data.followers },
@@ -149,16 +151,23 @@ const UserProfile = () => {
         </div>
 
         {isOwner ? (
-          <button onClick={() => setIsEditing(!isEditing)} className="text-blue-600">
+          <button
+            onClick={() => setIsEditing(!isEditing)}
+            className="text-blue-600"
+          >
             {isEditing ? "Cancel" : "Edit Profile"}
           </button>
         ) : (
-          <button onClick={toggleFollow} className="border px-4 py-1 rounded-full">
+          <button
+            onClick={toggleFollow}
+            className="border px-4 py-1 rounded-full"
+          >
             {isFollowing ? "Following" : "Follow"}
           </button>
         )}
       </div>
-              {/* ================= ABOUT ================= */}
+
+      {/* ================= ABOUT ================= */}
       <div className="bg-white border rounded-xl p-6 mt-5">
         <h3 className="font-semibold mb-2">About</h3>
 
@@ -183,7 +192,10 @@ const UserProfile = () => {
         {!isEditing ? (
           <div className="flex flex-wrap gap-2">
             {skills.length ? skills.map(skill => (
-              <span key={skill} className="bg-gray-100 px-3 py-1 rounded-full text-sm">
+              <span
+                key={skill}
+                className="bg-gray-100 px-3 py-1 rounded-full text-sm"
+              >
                 {skill}
               </span>
             )) : (
@@ -194,7 +206,10 @@ const UserProfile = () => {
           <>
             <div className="flex flex-wrap gap-2 mb-3">
               {skills.map(skill => (
-                <span key={skill} className="bg-gray-200 px-3 py-1 rounded-full text-sm flex items-center gap-1">
+                <span
+                  key={skill}
+                  className="bg-gray-200 px-3 py-1 rounded-full text-sm flex items-center gap-1"
+                >
                   {skill}
                   <button onClick={() => removeSkill(skill)}>×</button>
                 </span>
@@ -214,7 +229,10 @@ const UserProfile = () => {
 
       {isEditing && (
         <div className="mt-4 flex justify-end">
-          <button onClick={saveProfile} className="bg-[#0a66c2] text-white px-4 py-2 rounded text-sm">
+          <button
+            onClick={saveProfile}
+            className="bg-[#0a66c2] text-white px-4 py-2 rounded text-sm"
+          >
             Save Changes
           </button>
         </div>
@@ -224,13 +242,22 @@ const UserProfile = () => {
       <div className="flex gap-6 border-b mt-6 text-sm font-medium">
         <button
           onClick={() => setActiveTab("projects")}
-          className={activeTab === "projects" ? "border-b-2 border-blue-600" : ""}
+          className={
+            activeTab === "projects"
+              ? "border-b-2 border-blue-600"
+              : ""
+          }
         >
           Projects
         </button>
+
         <button
           onClick={() => setActiveTab("blogs")}
-          className={activeTab === "blogs" ? "border-b-2 border-blue-600" : ""}
+          className={
+            activeTab === "blogs"
+              ? "border-b-2 border-blue-600"
+              : ""
+          }
         >
           Blogs
         </button>
