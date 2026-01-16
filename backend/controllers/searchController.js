@@ -3,8 +3,10 @@ const User = require("../models/User");
 
 exports.search = async (req, res) => {
   try {
-    const {q} = req.query;
-    if (!q) return res.json({ users: [], projects: [] });
+    const q = req.query.q?.trim();
+    if (!q) {
+      return res.json({ users: [], projects: [] });
+    }
 
     const regex = new RegExp(q, "i");
 
@@ -13,17 +15,20 @@ exports.search = async (req, res) => {
         { name: regex },
         { username: regex }
       ]
-    }).select("name username");
+    })
+      .select("name username")
+      .limit(10);
 
     const projects = await Project.find({
       $or: [
         { title: regex },
         { description: regex },
-        { techStack: regex }
+        { techStack: { $in: [q] } }
       ]
     })
       .populate("owner", "name username")
-      .sort({ createdAt: -1 });
+      .sort({ createdAt: -1 })
+      .limit(20);
 
     res.json({ users, projects });
   } catch (err) {
