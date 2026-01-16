@@ -1,7 +1,7 @@
 const User = require("../models/User");
 const Project = require("../models/Project");
 const mongoose = require("mongoose");
-
+const Blog = require("../models/Blog");
 exports.toggleFollow = async (req, res) => {
   try {
     const targetUserId = req.params.id;
@@ -66,17 +66,24 @@ exports.getUserProfile = async (req, res) => {
     }
 
     const projects = await Project.find({ owner: userId })
-      .populate("owner", "name")
-      .populate("comments.author", "name")
+      .populate("owner", "name username")
+      .populate("comments.author", "name username")
+      .sort({ createdAt: -1 });
+
+    const blogs = await Blog.find({ author: userId })
+      .populate("author", "name username")
+      .populate("mentions", "username")
       .sort({ createdAt: -1 });
 
     res.json({
       user,
       projects,
+      blogs,
       followersCount: user.followers.length,
-      followingCount: user.following.length,
+      followingCount: user.following.length
     });
   } catch (err) {
+    console.error("Get profile error:", err);
     res.status(500).json({ message: "Server error" });
   }
 };

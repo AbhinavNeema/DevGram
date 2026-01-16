@@ -1,49 +1,33 @@
 const mongoose = require("mongoose");
 
+const commentSchema = new mongoose.Schema(
+  {
+    text: String,
+    author: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+    mentions: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
+  },
+  { timestamps: true }
+);
+
 const blogSchema = new mongoose.Schema(
   {
-    title: { type: String, required: true },
-    content: { type: String, required: true },
+    title: String,
+    content: String,
+
+    author: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
 
     techStack: [String],
+    mentions: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
 
     images: [
       {
         url: String,
-        public_id: String
-      }
+        public_id: String,
+      },
     ],
 
-    author: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
-      required: true,
-      index: true
-    },
-
-    likes: [
-      {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: "User"
-      }
-    ],
-
-    comments: [
-      {
-        text: String,
-        author: {
-          type: mongoose.Schema.Types.ObjectId,
-          ref: "User"
-        },
-        mentions: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
-        createdAt: { type: Date, default: Date.now }
-      }
-    ],
-
-    mentions: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
-
-    views: { type: Number, default: 0 },
-    viewedBy: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }]
+    likes: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
+    comments: [commentSchema],
   },
   { timestamps: true }
 );

@@ -25,7 +25,14 @@ const ProjectCard = ({ project }) => {
   const [activeImage, setActiveImage] = useState(null);
   const [viewed, setViewed] = useState(false);
   const [commentMentions, setCommentMentions] = useState([]);
+  const [copied, setCopied] = useState(false);
 
+  const handleShare = () => {
+    const url = `${window.location.origin}/project/${project._id}`;
+    navigator.clipboard.writeText(url);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  };
   const addView = async () => {
   if (viewed) return;
   try {
@@ -85,16 +92,27 @@ const ProjectCard = ({ project }) => {
           </p>
         </div>
 
-        {isOwner && (
-          <div className="text-xs flex gap-3">
-            <button onClick={() => navigate(`/projects/${project._id}/edit`)}>
-              Edit
-            </button>
-            <button onClick={deleteProject} className="text-red-500">
-              Delete
-            </button>
-          </div>
-        )}
+        <div className="text-xs flex gap-3">
+          {/* SHARE — visible to everyone */}
+          <button
+            onClick={handleShare}
+            className="text-blue-600"
+          >
+            {copied ? "Copied!" : "Share"}
+          </button>
+
+          {/* OWNER ACTIONS */}
+          {isOwner && (
+            <>
+              <button onClick={() => navigate(`/projects/${project._id}/edit`)}>
+                Edit
+              </button>
+              <button onClick={deleteProject} className="text-red-500">
+                Delete
+              </button>
+            </>
+          )}
+        </div>
       </div>
 
       <div className="px-4 mt-3">
