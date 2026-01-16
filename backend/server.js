@@ -14,10 +14,10 @@ mongoose
   .then(() => console.log("MongoDB connected"))
   .catch(err => console.error(err));
 
-app.use("/api/auth", require("./routes/authRoutes"));
-app.use("/api/projects", require("./routes/projectRoutes"));
-app.use("/api/users", require("./routes/userRoutes"));
-app.use("/api/search", require("./routes/searchRoutes"));
+app.use("/auth", require("./routes/authRoutes"));
+app.use("/projects", require("./routes/projectRoutes"));
+app.use("/users", require("./routes/userRoutes"));
+app.use("/search", require("./routes/searchRoutes"));
 
 const PORT=process.env.PORT||5001;
 

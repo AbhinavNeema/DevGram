@@ -27,7 +27,7 @@ const ProjectCard = ({ project }) => {
     if (viewed) return;
     try {
       const res = await axios.post(
-        `http://localhost:5001/api/projects/${project._id}/view`,
+        `http://localhost:5001/projects/${project._id}/view`,
         {},
         { headers: { Authorization: `Bearer ${token}` } }
       );
@@ -40,7 +40,7 @@ const ProjectCard = ({ project }) => {
   const handleLike = async () => {
     addView();
     const res = await axios.put(
-      `http://localhost:5001/api/projects/${project._id}/like`,
+      `http://localhost:5001/projects/${project._id}/like`,
       {},
       { headers: { Authorization: `Bearer ${token}` } }
     );
@@ -54,7 +54,7 @@ const ProjectCard = ({ project }) => {
     addView();
 
     const res = await axios.post(
-      `http://localhost:5001/api/projects/${project._id}/comments`,
+      `http://localhost:5001/projects/${project._id}/comments`,
       { text },
       { headers: { Authorization: `Bearer ${token}` } }
     );
@@ -65,7 +65,7 @@ const ProjectCard = ({ project }) => {
 
   const deleteComment = async (commentId) => {
     await axios.delete(
-      `http://localhost:5001/api/projects/${project._id}/comments/${commentId}`,
+      `http://localhost:5001/projects/${project._id}/comments/${commentId}`,
       { headers: { Authorization: `Bearer ${token}` } }
     );
     setComments(comments.filter(c => c._id !== commentId));
@@ -75,7 +75,7 @@ const ProjectCard = ({ project }) => {
   const deleteProject = async () => {
     if (!window.confirm("Delete this project?")) return;
     await axios.delete(
-      `http://localhost:5001/api/projects/${project._id}`,
+      `http://localhost:5001/projects/${project._id}`,
       { headers: { Authorization: `Bearer ${token}` } }
     );
     window.location.reload();
