@@ -13,8 +13,10 @@ const ProjectCard = ({ project }) => {
   const isOwner =
     project.owner?._id === userId || project.owner === userId;
 
-  const [likesCount, setLikesCount] = useState(project.likes.length);
-  const [liked, setLiked] = useState(project.likes.includes(userId));
+  const description = project.description || "";
+
+  const [likesCount, setLikesCount] = useState(project.likes?.length || 0);
+  const [liked, setLiked] = useState(project.likes?.includes(userId) || false);
   const [comments, setComments] = useState(project.comments || []);
   const [text, setText] = useState("");
   const [views, setViews] = useState(project.views || 0);
@@ -99,11 +101,11 @@ const ProjectCard = ({ project }) => {
         <h3 className="font-semibold">{project.title}</h3>
 
         <p className="text-sm text-gray-700 mt-1">
-          {expanded || project.description.length <= 180
-            ? renderMentions(project.description, project.mentions)
-            : renderMentions(project.description.slice(0, 180) + "...", project.mentions)}
+          {expanded || description.length <= 180
+            ? renderMentions(description, project.mentions)
+            : renderMentions(description.slice(0, 180) + "...", project.mentions)}
 
-          {project.description.length > 180 && (
+          {description.length > 180 && (
             <button
               onClick={() => {
                 setExpanded(!expanded);
@@ -134,7 +136,7 @@ const ProjectCard = ({ project }) => {
       )}
 
       <div className="px-4 mt-3 flex gap-2 flex-wrap">
-        {project.techStack.map(tag => (
+        {(project.techStack || []).map(tag => (
           <Link
             key={tag}
             to={`/?tag=${encodeURIComponent(tag)}`}

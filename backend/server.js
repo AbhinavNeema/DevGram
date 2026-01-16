@@ -18,7 +18,7 @@ app.use("/auth", require("./routes/authRoutes"));
 app.use("/projects", require("./routes/projectRoutes"));
 app.use("/users", require("./routes/userRoutes"));
 app.use("/search", require("./routes/searchRoutes"));
-
+app.use("/blogs", require("./routes/blogRoutes"));
 const PORT=process.env.PORT||5001;
 
 app.listen(PORT, () => {
