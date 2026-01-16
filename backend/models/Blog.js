@@ -25,7 +25,14 @@ const blogSchema = new mongoose.Schema(
         public_id: String,
       },
     ],
+    views: { type: Number, default: 0 },
 
+    viewedBy: [
+      {
+        user: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+        date: { type: String } // YYYY-MM-DD
+      }
+    ],
     likes: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
     comments: [commentSchema],
   },

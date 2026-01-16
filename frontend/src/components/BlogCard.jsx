@@ -10,8 +10,12 @@ const BlogCard = ({ blog }) => {
   const token = localStorage.getItem("token");
   const userId = token ? JSON.parse(atob(token.split(".")[1])).id : null;
 
-  const isOwner =
-    blog.author?._id === userId || blog.author === userId;
+  const authorId =
+  typeof blog.author === "string"
+    ? blog.author
+    : blog.author?._id;
+
+const isOwner = String(authorId) === String(userId);
 
   const content = blog.content || "";
 
@@ -24,6 +28,8 @@ const BlogCard = ({ blog }) => {
   const [activeImage, setActiveImage] = useState(null);
   const [commentMentions, setCommentMentions] = useState([]);
     const [copied, setCopied] = useState(false);
+  const [views, setViews] = useState(blog.views || 0);
+  const [viewed, setViewed] = useState(false);
 
 const handleShare = async () => {
   const link = `${window.location.origin}/blog/${blog._id}`;
@@ -35,8 +41,18 @@ const handleShare = async () => {
     console.error("Copy failed", err);
   }
 };
+
+const addView = async () => {
+  if (viewed) return;
+  try {
+    const res = await api.post(`/blogs/${blog._id}/view`);
+    setViews(res.data.views);
+    setViewed(true);
+  } catch (err) {}
+};
   /* ================= LIKE ================= */
   const handleLike = async () => {
+    await addView();
     const res = await api.put(`/blogs/${blog._id}/like`);
     setLiked(res.data.liked);
     setLikesCount(res.data.likesCount);
@@ -118,7 +134,10 @@ const handleShare = async () => {
 
           {content.length > 220 && (
             <button
-              onClick={() => setExpanded(!expanded)}
+              onClick={() => {
+                setExpanded(!expanded);
+                addView();
+              }}
               className="ml-1 text-blue-600 font-medium"
             >
               {expanded ? "Read less" : "Read more"}
@@ -135,7 +154,10 @@ const handleShare = async () => {
               key={i}
               src={img.url}
               className="h-48 w-full object-cover rounded cursor-pointer"
-              onClick={() => setActiveImage(img.url)}
+              onClick={() => {
+                addView();
+                setActiveImage(img.url);
+              }}
             />
           ))}
         </div>
@@ -158,6 +180,7 @@ const handleShare = async () => {
       <div className="px-4 mt-4 flex gap-6 text-sm text-gray-600">
         <button onClick={handleLike}>❤️ {likesCount}</button>
         <span>💬 {comments.length}</span>
+        <span>👀 {views}</span>
       </div>
 
       {/* ================= COMMENTS ================= */}

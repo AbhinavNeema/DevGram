@@ -10,7 +10,7 @@ router.get("/:id", auth, blog.getBlogById);
 router.put("/:id/like", auth, blog.likeBlog);
 router.post("/:id/comments", auth, blog.addComment);
 router.delete("/:blogId/comments/:commentId", auth, blog.deleteComment);
-
+router.post("/:id/view", auth, blog.addView);
 router.put("/:id", auth, blog.updateBlog);
 router.delete("/:id", auth, blog.deleteBlog);
 router.get("/user/:id", auth, blog.getBlogsByUser);
