@@ -13,6 +13,7 @@ import MainLayout from "./layouts/MainLayout";
 import Trending from "./pages/Trending";
 import ProjectPage from "./pages/ProjectPage";
 import BlogPage from "./pages/BlogPage";
+import DM from "./pages/DM";
 function App() {
   return (
     <AuthProvider>
@@ -50,7 +51,27 @@ function App() {
               </ProtectedRoute>
           }/>
 
-      
+          <Route
+  path="/dm"
+  element={
+    <ProtectedRoute>
+      <MainLayout>
+        <DM />
+      </MainLayout>
+    </ProtectedRoute>
+  }
+/>
+
+<Route
+  path="/dm/:conversationId"
+  element={
+    <ProtectedRoute>
+      <MainLayout>
+        <DM />
+      </MainLayout>
+    </ProtectedRoute>
+  }
+/>
           <Route path="/project/:id" element={
             <ProtectedRoute>
                 <MainLayout>
