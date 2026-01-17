@@ -1,13 +1,16 @@
 import { useEffect, useState, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import api from "../api/axios";
+import { io } from "socket.io-client";
+
+const socket = io("http://localhost:5001", {
+  autoConnect: false,
+});
 
 const DM = () => {
-  
-  const navigate = useNavigate();
   const { conversationId } = useParams();
+  const navigate = useNavigate();
   const messagesEndRef = useRef(null);
-  console.log("DM conversationId:", conversationId);
 
   const token = localStorage.getItem("token");
   const currentUserId = token
@@ -26,21 +29,19 @@ const DM = () => {
     });
   }, []);
 
-  /* ================= LOAD CONVERSATION FROM URL ================= */
+  /* ================= SET ACTIVE CONVERSATION ================= */
   useEffect(() => {
-    if (!conversationId) {
+    if (!conversationId || inbox.length === 0) {
       setActiveConversation(null);
       setMessages([]);
       return;
     }
 
     const conv = inbox.find(c => c._id === conversationId);
-    if (conv) {
-      setActiveConversation(conv);
-    }
+    if (conv) setActiveConversation(conv);
   }, [conversationId, inbox]);
 
-  /* ================= LOAD MESSAGES ================= */
+  /* ================= LOAD MESSAGE HISTORY ================= */
   useEffect(() => {
     if (!conversationId) return;
 
@@ -48,6 +49,34 @@ const DM = () => {
       setMessages(res.data);
       scrollToBottom();
     });
+  }, [conversationId]);
+
+  /* ================= SOCKET JOIN ================= */
+  useEffect(() => {
+    if (!conversationId) return;
+
+    socket.connect();
+    socket.emit("joinConversation", conversationId);
+
+    return () => {
+      socket.disconnect();
+    };
+  }, [conversationId]);
+
+  /* ================= SOCKET LISTENER ================= */
+  useEffect(() => {
+    socket.on("newMessage", msg => {
+      if (msg.conversation !== conversationId) return;
+
+      setMessages(prev => {
+        if (prev.some(m => m._id === msg._id)) return prev;
+        return [...prev, msg];
+      });
+
+      scrollToBottom();
+    });
+
+    return () => socket.off("newMessage");
   }, [conversationId]);
 
   const scrollToBottom = () => {
@@ -60,23 +89,12 @@ const DM = () => {
   const sendMessage = async () => {
     if (!text.trim() || !conversationId) return;
 
-    const res = await api.post("/messages/send", {
+    await api.post("/messages/send", {
       conversationId,
       text,
     });
 
-    setMessages(prev => [...prev, res.data]);
-    setText("");
-
-    setInbox(prev =>
-      prev.map(c =>
-        c._id === conversationId
-          ? { ...c, lastMessage: res.data }
-          : c
-      )
-    );
-
-    scrollToBottom();
+    setText(""); // ⚠️ do NOT manually push message here
   };
 
   /* ================= OTHER USER ================= */
@@ -85,7 +103,6 @@ const DM = () => {
   );
 
   return (
-    
     <div className="max-w-5xl mx-auto p-6">
       <h2 className="text-xl font-semibold mb-4">Messages</h2>
 
@@ -105,10 +122,7 @@ const DM = () => {
             return (
               <div
                 key={conv._id}
-                onClick={() => {
-                  setActiveConversation(conv);
-                  navigate(`/dm/${conv._id}`);
-                }}
+                onClick={() => navigate(`/dm/${conv._id}`)}
                 className={`p-4 cursor-pointer border-b hover:bg-gray-50 ${
                   conversationId === conv._id ? "bg-gray-100" : ""
                 }`}
@@ -125,12 +139,10 @@ const DM = () => {
         {/* RIGHT: CHAT */}
         <div className="flex-1 flex flex-col">
 
-          {/* HEADER */}
           <div className="border-b p-3 font-medium">
             {otherUser?.name || "Select a conversation"}
           </div>
 
-          {/* MESSAGES */}
           <div className="flex-1 p-4 overflow-y-auto space-y-2">
             {messages.map(msg => (
               <div
@@ -147,7 +159,6 @@ const DM = () => {
             <div ref={messagesEndRef} />
           </div>
 
-          {/* INPUT */}
           {activeConversation && (
             <div className="border-t p-3 flex gap-2">
               <input
