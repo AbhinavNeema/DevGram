@@ -8,7 +8,15 @@ import { useRef } from "react";
 const UserProfile = () => {
   const { id, username } = useParams();
   const navigate = useNavigate();
-
+  const startDM = async () => {
+  try {
+    const res = await api.get(`/messages/start/${user._id}`);
+    console.log("Conversation:", res.data);
+    navigate(`/dm/${res.data._id}`);
+  } catch (err) {
+    console.error("Failed to start DM", err);
+  }
+};
   const [data, setData] = useState(null);
   const [blogs, setBlogs] = useState([]);
   const [activeTab, setActiveTab] = useState("projects");
@@ -184,6 +192,14 @@ const UserProfile = () => {
             </button>
           )}
         </div>
+            {!isOwner && (
+  <button
+    onClick={() => startDM(user._id)}
+    className="border px-4 py-1 rounded-full text-sm"
+  >
+    Message
+  </button>
+)}
       </div>
 
       {/* ================= ABOUT ================= */}

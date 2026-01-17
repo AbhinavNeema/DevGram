@@ -52,8 +52,14 @@ const Navbar = () => {
               className="bg-transparent outline-none text-sm w-64"
             />
           </form>
+          <Link
+          to="/dm"
+          className="text-sm font-medium text-gray-700 hover:text-blue-600"
+        >
+          💬 Messages
+        </Link>
         </div>
-
+        
         {/* RIGHT */}
         <div className="flex items-center gap-5 text-sm font-medium">
 
