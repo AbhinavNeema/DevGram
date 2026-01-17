@@ -1,6 +1,25 @@
 const Conversation = require("../models/Conversation");
 const Message = require("../models/Message");
+const { getIO } = require("../socket");
 
+// exports.sendMessage = async (req, res) => {
+//   const { conversationId, text } = req.body;
+
+//   const message = await Message.create({
+//     conversation: conversationId,
+//     sender: req.user.id,
+//     text,
+//   });
+
+//   await message.populate("sender", "name");
+
+//   // 🔥 REAL-TIME EMIT
+//   getIO()
+//     .to(conversationId)
+//     .emit("newMessage", message);
+
+//   res.json(message);
+// };
 /* START OR GET CONVERSATION */
 exports.startConversation = async (req, res) => {
   const userId = req.userId;
@@ -53,7 +72,7 @@ exports.sendMessage = async (req, res) => {
     }
 
     const message = await Message.create({
-      conversation: conversationId,   // ✅ FIX
+      conversation: conversationId,
       sender: req.userId,
       text,
     });
@@ -63,6 +82,12 @@ exports.sendMessage = async (req, res) => {
     });
 
     const populated = await message.populate("sender", "name");
+
+    // 🔥 REAL-TIME
+    getIO()
+      .to(conversationId)
+      .emit("newMessage", populated);
+
     res.json(populated);
   } catch (err) {
     console.error("sendMessage error:", err);
