@@ -289,7 +289,11 @@ const UserProfile = () => {
             <p className="text-sm text-gray-500">No projects yet</p>
           ) : (
             projects.map(p => (
-              <ProjectCard key={p._id} project={p} />
+              <ProjectCard
+                key={p._id}
+                project={p}
+                showOwnerActions
+              />
             ))
           )
         )}
@@ -299,7 +303,7 @@ const UserProfile = () => {
             <p className="text-sm text-gray-500">No blogs written yet</p>
           ) : (
             blogs.map(b => (
-              <BlogCard key={b._id} blog={b} />
+              <BlogCard key={b._id} blog={b} showOwnerActions/>
             ))
           )
         )}

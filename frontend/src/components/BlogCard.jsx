@@ -5,7 +5,7 @@ import { timeAgo } from "../utils/timeAgo";
 import { renderMentions } from "../utils/renderMentions";
 import MentionInput from "../components/MentionInput";
 
-const BlogCard = ({ blog }) => {
+const BlogCard = ({ blog, showOwnerActions = false }) => {
   const navigate = useNavigate();
   const token = localStorage.getItem("token");
   const userId = token ? JSON.parse(atob(token.split(".")[1])).id : null;
@@ -114,8 +114,8 @@ const addView = async () => {
     {copied ? "Copied!" : "Share"}
   </button>
 
-  {/* DELETE — only owner */}
-  {isOwner && (
+  {/* DELETE — only if showOwnerActions and owner */}
+  {showOwnerActions && isOwner && (
     <button onClick={deleteBlog} className="text-red-500">
       Delete
     </button>
