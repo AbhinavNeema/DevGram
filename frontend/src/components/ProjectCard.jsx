@@ -5,7 +5,7 @@ import { timeAgo } from "../utils/timeAgo";
 import { renderMentions } from "../utils/renderMentions.jsx";
 import MentionInput from "../components/MentionInput";
 
-const ProjectCard = ({ project }) => {
+const ProjectCard = ({ project, showOwnerActions = false }) => {
   const navigate = useNavigate();
   const token = localStorage.getItem("token");
   const userId = JSON.parse(atob(token.split(".")[1])).id;
@@ -102,7 +102,7 @@ const ProjectCard = ({ project }) => {
           </button>
 
           {/* OWNER ACTIONS */}
-          {isOwner && (
+          {isOwner && showOwnerActions && (
             <>
               <button onClick={() => navigate(`/projects/${project._id}/edit`)}>
                 Edit
