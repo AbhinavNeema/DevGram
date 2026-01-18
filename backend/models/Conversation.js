@@ -8,6 +8,11 @@ const conversationSchema = new mongoose.Schema(
       required: true,
       validate: v => v.length === 2, // ONE TO ONE
     },
+    unreadCounts: {
+      type: Map,
+      of: Number,
+      default: {},
+    },
     lastMessage: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Message",
