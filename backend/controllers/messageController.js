@@ -25,7 +25,14 @@ exports.startConversation = async (req, res) => {
   const userId = req.userId;
   const otherUserId = req.params.userId;
 
-  const participants = [userId, otherUserId].sort();
+  if (userId === otherUserId) {
+    return res.status(400).json({ message: "Cannot DM yourself" });
+  }
+
+  // 🔑 ALWAYS SORT
+  const participants = [userId, otherUserId]
+    .map(id => id.toString())
+    .sort();
 
   let conversation = await Conversation.findOne({
     participants,
@@ -33,12 +40,11 @@ exports.startConversation = async (req, res) => {
 
   if (!conversation) {
     conversation = await Conversation.create({ participants });
-    conversation = await conversation.populate("participants", "name");
+    await conversation.populate("participants", "name");
   }
 
   res.json(conversation);
 };
-
 /* GET INBOX */
 exports.getInbox = async (req, res) => {
   const userId = req.userId;
@@ -93,4 +99,67 @@ exports.sendMessage = async (req, res) => {
     console.error("sendMessage error:", err);
     res.status(500).json({ message: "Server error" });
   }
+};
+
+// controllers/messageController.js
+exports.markAsRead = async (req, res) => {
+  const { conversationId } = req.params;
+
+  await Message.updateMany(
+    {
+      conversation: conversationId,
+      readBy: { $ne: req.userId },
+    },
+    {
+      $push: { readBy: req.userId },
+    }
+  );
+
+  res.json({ success: true });
+};
+
+exports.getInbox = async (req, res) => {
+  const userId = req.userId;
+
+  const conversations = await Conversation.find({
+    participants: userId,
+  })
+    .populate("participants", "name")
+    .populate("lastMessage")
+    .sort({ updatedAt: -1 });
+
+  const data = await Promise.all(
+    conversations.map(async conv => {
+      const unreadCount = await Message.countDocuments({
+        conversation: conv._id,
+        readBy: { $ne: userId },
+        sender: { $ne: userId },
+      });
+
+      return { ...conv.toObject(), unreadCount };
+    })
+  );
+
+  res.json(data);
+};
+
+exports.deleteMessage = async (req, res) => {
+  const msg = await Message.findById(req.params.id);
+  await msg.deleteOne();
+
+  getIO().to(msg.conversation.toString()).emit("deleteMessage", msg._id);
+
+  res.json({ success: true });
+};
+
+exports.editMessage = async (req, res) => {
+  const msg = await Message.findByIdAndUpdate(
+    req.params.id,
+    { text: req.body.text },
+    { new: true }
+  ).populate("sender", "name");
+
+  getIO().to(msg.conversation.toString()).emit("editMessage", msg);
+
+  res.json(msg);
 };

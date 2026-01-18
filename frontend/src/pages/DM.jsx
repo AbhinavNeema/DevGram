@@ -2,6 +2,7 @@ import { useEffect, useState, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import api from "../api/axios";
 import { io } from "socket.io-client";
+import toast from "react-hot-toast";
 
 const socket = io("http://localhost:5001", {
   autoConnect: false,
@@ -22,16 +23,27 @@ const DM = () => {
   const [messages, setMessages] = useState([]);
   const [text, setText] = useState("");
 
+  /* ================= SOCKET CONNECT ONCE ================= */
+  useEffect(() => {
+    if (!socket.connected) {
+      socket.connect();
+    }
+
+    return () => {
+      socket.off("newMessage");
+      socket.off("editMessage");
+      socket.off("deleteMessage");
+    };
+  }, []);
+
   /* ================= LOAD INBOX ================= */
   useEffect(() => {
-    api.get("/messages/inbox").then(res => {
-      setInbox(res.data);
-    });
+    api.get("/messages/inbox").then(res => setInbox(res.data));
   }, []);
 
   /* ================= SET ACTIVE CONVERSATION ================= */
   useEffect(() => {
-    if (!conversationId || inbox.length === 0) {
+    if (!conversationId) {
       setActiveConversation(null);
       setMessages([]);
       return;
@@ -40,7 +52,22 @@ const DM = () => {
     const conv = inbox.find(c => c._id === conversationId);
     if (conv) setActiveConversation(conv);
   }, [conversationId, inbox]);
+useEffect(() => {
+  socket.on("editMessage", msg => {
+    setMessages(prev =>
+      prev.map(m => (m._id === msg._id ? msg : m))
+    );
+  });
 
+  socket.on("deleteMessage", id => {
+    setMessages(prev => prev.filter(m => m._id !== id));
+  });
+
+  return () => {
+    socket.off("editMessage");
+    socket.off("deleteMessage");
+  };
+}, []);
   /* ================= LOAD MESSAGE HISTORY ================= */
   useEffect(() => {
     if (!conversationId) return;
@@ -49,24 +76,34 @@ const DM = () => {
       setMessages(res.data);
       scrollToBottom();
     });
-  }, [conversationId]);
 
-  /* ================= SOCKET JOIN ================= */
-  useEffect(() => {
-    if (!conversationId) return;
-
-    socket.connect();
+    api.put(`/messages/read/${conversationId}`);
+    setInbox(prev => prev.map(c => c._id === conversationId ? { ...c, unreadCount: 0 } : c));
     socket.emit("joinConversation", conversationId);
-
-    return () => {
-      socket.disconnect();
-    };
   }, [conversationId]);
 
   /* ================= SOCKET LISTENER ================= */
   useEffect(() => {
-    socket.on("newMessage", msg => {
-      if (msg.conversation !== conversationId) return;
+    if (!conversationId) return;
+
+    const handleNewMessage = msg => {
+      setInbox(prev =>
+        prev.map(c => {
+          if (c._id === msg.conversation) {
+            const updated = { ...c, lastMessage: msg };
+            if (msg.sender._id !== currentUserId && msg.conversation !== conversationId) {
+              updated.unreadCount = (updated.unreadCount || 0) + 1;
+            }
+            return updated;
+          }
+          return c;
+        })
+      );
+
+      if (msg.conversation !== conversationId && msg.sender._id !== currentUserId) {
+        toast.success(`New message from ${msg.sender.name}`);
+        return;
+      }
 
       setMessages(prev => {
         if (prev.some(m => m._id === msg._id)) return prev;
@@ -74,10 +111,14 @@ const DM = () => {
       });
 
       scrollToBottom();
-    });
+    };
 
-    return () => socket.off("newMessage");
-  }, [conversationId]);
+    socket.on("newMessage", handleNewMessage);
+
+    return () => {
+      socket.off("newMessage", handleNewMessage);
+    };
+  }, [conversationId, currentUserId]);
 
   const scrollToBottom = () => {
     setTimeout(() => {
@@ -89,15 +130,41 @@ const DM = () => {
   const sendMessage = async () => {
     if (!text.trim() || !conversationId) return;
 
-    await api.post("/messages/send", {
-      conversationId,
-      text,
-    });
+    const msgText = text;
+    setText("");
 
-    setText(""); // ⚠️ do NOT manually push message here
+    setInbox(prev => prev.map(c => c._id === conversationId ? { ...c, lastMessage: { text: msgText, sender: { _id: currentUserId } } } : c));
+
+    try {
+      await api.post("/messages/send", {
+        conversationId,
+        text: msgText,
+      });
+    } catch (err) {
+      console.error("Send message failed", err);
+    }
   };
 
-  /* ================= OTHER USER ================= */
+  /* ================= EDIT MESSAGE ================= */
+  const editMessage = async msg => {
+    const newText = prompt("Edit message", msg.text);
+    if (!newText || newText === msg.text) return;
+
+    const res = await api.put(`/messages/message/${msg._id}`, {
+      text: newText,
+    });
+
+    setMessages(prev =>
+      prev.map(m => (m._id === msg._id ? res.data : m))
+    );
+  };
+
+  /* ================= DELETE MESSAGE ================= */
+  const deleteMessage = async id => {
+    await api.delete(`/messages/message/${id}`);
+    setMessages(prev => prev.filter(m => m._id !== id));
+  };
+
   const otherUser = activeConversation?.participants?.find(
     p => p._id !== currentUserId
   );
@@ -108,12 +175,8 @@ const DM = () => {
 
       <div className="border rounded-lg h-[70vh] flex overflow-hidden">
 
-        {/* LEFT: INBOX */}
+        {/* INBOX */}
         <div className="w-1/3 border-r overflow-y-auto">
-          {inbox.length === 0 && (
-            <p className="p-4 text-sm text-gray-500">No conversations</p>
-          )}
-
           {inbox.map(conv => {
             const other = conv.participants.find(
               p => p._id !== currentUserId
@@ -131,14 +194,19 @@ const DM = () => {
                 <p className="text-xs text-gray-500 truncate">
                   {conv.lastMessage?.text || "No messages yet"}
                 </p>
+
+                {(conv.unreadCount || 0) > 0 && (
+                  <span className="ml-auto bg-blue-600 text-white text-xs px-2 rounded-full">
+                    {conv.unreadCount}
+                  </span>
+                )}
               </div>
             );
           })}
         </div>
 
-        {/* RIGHT: CHAT */}
+        {/* CHAT */}
         <div className="flex-1 flex flex-col">
-
           <div className="border-b p-3 font-medium">
             {otherUser?.name || "Select a conversation"}
           </div>
@@ -154,6 +222,23 @@ const DM = () => {
                 }`}
               >
                 {msg.text}
+
+                {msg.sender?._id === currentUserId && (
+                  <div className="text-xs text-right mt-1">
+                    <button
+                      onClick={() => editMessage(msg)}
+                      className="text-blue-200"
+                    >
+                      Edit
+                    </button>
+                    <button
+                      onClick={() => deleteMessage(msg._id)}
+                      className="ml-2 text-red-300"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                )}
               </div>
             ))}
             <div ref={messagesEndRef} />
@@ -177,7 +262,6 @@ const DM = () => {
               </button>
             </div>
           )}
-
         </div>
       </div>
     </div>
