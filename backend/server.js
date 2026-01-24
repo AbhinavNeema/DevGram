@@ -20,7 +20,7 @@ app.use("/projects", require("./routes/projectRoutes"));
 app.use("/users", require("./routes/userRoutes"));
 app.use("/blogs", require("./routes/blogRoutes"));
 app.use("/messages", require("./routes/message"));
-
+app.use("/search",require("./routes/searchRoutes"))
 const server = http.createServer(app);
 initSocket(server);
 
