@@ -133,204 +133,225 @@ const UserProfile = () => {
   };
 
   return (
-    <div className="max-w-5xl mx-auto px-4">
+  <div className="max-w-5xl mx-auto px-4 pb-20">
 
-      {/* ================= PROFILE CARD ================= */}
-      <div className="bg-white border rounded-xl p-6 flex gap-6 items-center">
-        <div className="w-20 h-20 rounded-full bg-gray-200 flex items-center justify-center text-2xl font-bold text-[#0a66c2]">
+    {/* ================= PROFILE CARD ================= */}
+    <div className="bg-white border rounded-2xl p-6 flex flex-col sm:flex-row gap-6 items-start sm:items-center
+                    shadow-sm hover:shadow-md transition-all">
+
+      {/* Avatar */}
+      <div className="relative">
+        <div className="w-20 h-20 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600
+                        flex items-center justify-center text-2xl font-bold text-white shadow">
           {user.name?.[0]}
         </div>
-
-        <div className="flex-1">
-          <h2 className="text-xl font-semibold">{user.name}</h2>
-          <p className="text-sm text-gray-500">@{user.username}</p>
-
-          {!isEditing ? (
-            <p className="text-sm mt-2">{user.bio || "Add a bio"}</p>
-          ) : (
-            <input
-              value={bio}
-              onChange={e => setBio(e.target.value)}
-              className="border px-2 py-1 rounded text-sm w-full mt-2"
-            />
-          )}
-
-          <div className="flex gap-6 mt-3 text-sm text-gray-600">
-            <span><b>{user.followers.length}</b> followers</span>
-            <span><b>{user.following.length}</b> following</span>
-            <span><b>{projects.length}</b> projects</span>
-          </div>
-        </div>
-
-        <div className="flex gap-3 items-center">
-          <button
-            onClick={async () => {
-              const link = `${window.location.origin}/user/${user._id}`;
-              await navigator.clipboard.writeText(link);
-              setToast("Profile link copied!");
-              clearTimeout(toastTimeout.current);
-              toastTimeout.current = setTimeout(() => setToast(""), 1500);
-            }}
-            className="text-sm text-blue-600"
-          >
-            Share
-          </button>
-
-          {isOwner ? (
-            <button
-              onClick={() => setIsEditing(!isEditing)}
-              className="text-sm text-blue-600"
-            >
-              {isEditing ? "Cancel" : "Edit Profile"}
-            </button>
-          ) : (
-            <button
-              onClick={toggleFollow}
-              className="border px-4 py-1 rounded-full text-sm"
-            >
-              {isFollowing ? "Following" : "Follow"}
-            </button>
-          )}
-        </div>
-            {!isOwner && (
-  <button
-    onClick={() => startDM(user._id)}
-    className="border px-4 py-1 rounded-full text-sm"
-  >
-    Message
-  </button>
-)}
       </div>
 
-      {/* ================= ABOUT ================= */}
-      <div className="bg-white border rounded-xl p-6 mt-5">
-        <h3 className="font-semibold mb-2">About</h3>
+      {/* Info */}
+      <div className="flex-1 w-full">
+        <div className="flex flex-wrap items-center gap-2">
+          <h2 className="text-xl font-semibold text-gray-900">{user.name}</h2>
+          <span className="text-sm text-gray-500">@{user.username}</span>
+        </div>
 
         {!isEditing ? (
-          <p className="text-sm text-gray-700">
-            {user.about || "Add something about yourself"}
+          <p className="text-sm mt-2 text-gray-700">
+            {user.bio || <span className="text-gray-400">Add a bio</span>}
           </p>
         ) : (
-          <textarea
-            value={about}
-            onChange={e => setAbout(e.target.value)}
-            className="border rounded w-full p-2 text-sm"
-            rows={4}
+          <input
+            value={bio}
+            onChange={e => setBio(e.target.value)}
+            className="border px-3 py-2 rounded-lg text-sm w-full mt-2
+                       focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         )}
+
+        <div className="flex gap-6 mt-4 text-sm text-gray-600">
+          <span><b className="text-gray-900">{user.followers.length}</b> followers</span>
+          <span><b className="text-gray-900">{user.following.length}</b> following</span>
+          <span><b className="text-gray-900">{projects.length}</b> projects</span>
+        </div>
       </div>
 
-      {/* ================= SKILLS ================= */}
-      <div className="bg-white border rounded-xl p-6 mt-5">
-        <h3 className="font-semibold mb-3">Skills</h3>
+      {/* Actions */}
+      <div className="flex gap-3 items-center flex-wrap">
+        <button
+          onClick={async () => {
+            const link = `${window.location.origin}/user/${user._id}`;
+            await navigator.clipboard.writeText(link);
+            setToast("Profile link copied!");
+            clearTimeout(toastTimeout.current);
+            toastTimeout.current = setTimeout(() => setToast(""), 1500);
+          }}
+          className="text-sm text-blue-600 hover:underline"
+        >
+          Share
+        </button>
 
-        {!isEditing ? (
-          <div className="flex flex-wrap gap-2">
-            {skills.length ? skills.map(skill => (
-              <span
-                key={skill}
-                className="bg-gray-100 px-3 py-1 rounded-full text-sm"
-              >
-                {skill}
-              </span>
-            )) : (
-              <p className="text-sm text-gray-500">No skills added</p>
-            )}
-          </div>
-        ) : (
-          <>
-            <div className="flex flex-wrap gap-2 mb-3">
-              {skills.map(skill => (
-                <span
-                  key={skill}
-                  className="bg-gray-200 px-3 py-1 rounded-full text-sm flex items-center gap-1"
-                >
-                  {skill}
-                  <button onClick={() => removeSkill(skill)}>×</button>
-                </span>
-              ))}
-            </div>
-
-            <input
-              value={skillInput}
-              onChange={e => setSkillInput(e.target.value)}
-              onKeyDown={addSkill}
-              placeholder="Type a skill and press Enter"
-              className="border px-3 py-1 rounded w-full text-sm"
-            />
-          </>
-        )}
-      </div>
-
-      {isEditing && (
-        <div className="mt-4 flex justify-end">
+        {isOwner ? (
           <button
-            onClick={saveProfile}
-            className="bg-[#0a66c2] text-white px-4 py-2 rounded text-sm"
+            onClick={() => setIsEditing(!isEditing)}
+            className="text-sm text-blue-600 hover:underline"
           >
-            Save Changes
+            {isEditing ? "Cancel" : "Edit Profile"}
           </button>
-        </div>
-      )}
-
-      {/* ================= TABS ================= */}
-      <div className="flex gap-6 border-b mt-6 text-sm font-medium">
-        <button
-          onClick={() => setActiveTab("projects")}
-          className={
-            activeTab === "projects"
-              ? "border-b-2 border-blue-600"
-              : ""
-          }
-        >
-          Projects
-        </button>
-
-        <button
-          onClick={() => setActiveTab("blogs")}
-          className={
-            activeTab === "blogs"
-              ? "border-b-2 border-blue-600"
-              : ""
-          }
-        >
-          Blogs
-        </button>
-      </div>
-
-      {/* ================= TAB CONTENT ================= */}
-      <div className="mt-5 space-y-4">
-        {activeTab === "projects" && (
-          projects.length === 0 ? (
-            <p className="text-sm text-gray-500">No projects yet</p>
-          ) : (
-            projects.map(p => (
-              <ProjectCard
-                key={p._id}
-                project={p}
-                showOwnerActions
-              />
-            ))
-          )
+        ) : (
+          <button
+            onClick={toggleFollow}
+            className={`px-4 py-1 rounded-full text-sm border transition
+              ${isFollowing
+                ? "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                : "bg-blue-600 text-white hover:bg-blue-700"}`}
+          >
+            {isFollowing ? "Following" : "Follow"}
+          </button>
         )}
 
-        {activeTab === "blogs" && (
-          blogs.length === 0 ? (
-            <p className="text-sm text-gray-500">No blogs written yet</p>
-          ) : (
-            blogs.map(b => (
-              <BlogCard key={b._id} blog={b} showOwnerActions/>
-            ))
-          )
+        {!isOwner && (
+          <button
+            onClick={() => startDM(user._id)}
+            className="border px-4 py-1 rounded-full text-sm
+                       hover:bg-gray-100 transition"
+          >
+            Message
+          </button>
         )}
       </div>
-      {toast && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-black text-white px-4 py-2 rounded-full text-sm shadow-lg z-50">
-          {toast}
-        </div>
+    </div>
+
+    {/* ================= ABOUT ================= */}
+    <div className="bg-white border rounded-2xl p-6 mt-6 shadow-sm">
+      <h3 className="font-semibold mb-2 text-gray-900">About</h3>
+
+      {!isEditing ? (
+        <p className="text-sm text-gray-700">
+          {user.about || <span className="text-gray-400">Add something about yourself</span>}
+        </p>
+      ) : (
+        <textarea
+          value={about}
+          onChange={e => setAbout(e.target.value)}
+          className="border rounded-lg w-full p-3 text-sm
+                     focus:outline-none focus:ring-2 focus:ring-blue-500"
+          rows={4}
+        />
       )}
     </div>
-  );
+
+    {/* ================= SKILLS ================= */}
+    <div className="bg-white border rounded-2xl p-6 mt-6 shadow-sm">
+      <h3 className="font-semibold mb-3 text-gray-900">Skills</h3>
+
+      {!isEditing ? (
+        <div className="flex flex-wrap gap-2">
+          {skills.length ? skills.map(skill => (
+            <span
+              key={skill}
+              className="bg-blue-50 text-blue-700 px-3 py-1 rounded-full text-sm"
+            >
+              {skill}
+            </span>
+          )) : (
+            <p className="text-sm text-gray-400">No skills added</p>
+          )}
+        </div>
+      ) : (
+        <>
+          <div className="flex flex-wrap gap-2 mb-3">
+            {skills.map(skill => (
+              <span
+                key={skill}
+                className="bg-gray-100 px-3 py-1 rounded-full text-sm flex items-center gap-2"
+              >
+                {skill}
+                <button
+                  onClick={() => removeSkill(skill)}
+                  className="text-gray-500 hover:text-red-500"
+                >
+                  ×
+                </button>
+              </span>
+            ))}
+          </div>
+
+          <input
+            value={skillInput}
+            onChange={e => setSkillInput(e.target.value)}
+            onKeyDown={addSkill}
+            placeholder="Type a skill and press Enter"
+            className="border px-3 py-2 rounded-lg w-full text-sm
+                       focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </>
+      )}
+    </div>
+
+    {isEditing && (
+      <div className="mt-5 flex justify-end">
+        <button
+          onClick={saveProfile}
+          className="bg-blue-600 text-white px-5 py-2 rounded-lg text-sm
+                     hover:bg-blue-700 transition shadow"
+        >
+          Save Changes
+        </button>
+      </div>
+    )}
+
+    {/* ================= TABS ================= */}
+    <div className="flex gap-8 border-b mt-8 text-sm font-medium">
+      {["projects", "blogs"].map(tab => (
+        <button
+          key={tab}
+          onClick={() => setActiveTab(tab)}
+          className={`pb-3 transition relative
+            ${activeTab === tab
+              ? "text-blue-600"
+              : "text-gray-500 hover:text-gray-700"}`}
+        >
+          {tab.charAt(0).toUpperCase() + tab.slice(1)}
+          {activeTab === tab && (
+            <span className="absolute left-0 right-0 -bottom-[1px] h-[2px] bg-blue-600 rounded" />
+          )}
+        </button>
+      ))}
+    </div>
+
+    {/* ================= TAB CONTENT ================= */}
+    <div className="mt-6 space-y-4">
+      {activeTab === "projects" && (
+        projects.length === 0 ? (
+          <p className="text-sm text-gray-400">No projects yet</p>
+        ) : (
+          projects.map(p => (
+            <ProjectCard key={p._id} project={p} showOwnerActions />
+          ))
+        )
+      )}
+
+      {activeTab === "blogs" && (
+        blogs.length === 0 ? (
+          <p className="text-sm text-gray-400">No blogs written yet</p>
+        ) : (
+          blogs.map(b => (
+            <BlogCard key={b._id} blog={b} showOwnerActions />
+          ))
+        )
+      )}
+    </div>
+
+    {/* ================= TOAST ================= */}
+    {toast && (
+      <div className="fixed bottom-6 left-1/2 -translate-x-1/2
+                      bg-black text-white px-4 py-2 rounded-full text-sm
+                      shadow-lg animate-fadeIn z-50">
+        {toast}
+      </div>
+    )}
+  </div>
+);
+
 };
 
 export default UserProfile;

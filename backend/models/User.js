@@ -23,7 +23,7 @@ const userSchema = new mongoose.Schema(
     preferredTags: {
       type: [String],
       default: []
-    }
+    },
   },
   { timestamps: true }
 );
