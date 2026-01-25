@@ -10,15 +10,11 @@ exports.register = async (req, res) => {
       return res.status(400).json({ message: "All fields required" });
     }
 
-    const normalizedUsername = username;
-    if (!username) {
-      return res.status(400).json({ message: "Username required" });
-    }
-
     if (!/^[a-z0-9_.]+$/.test(username)) {
       return res.status(400).json({ message: "Invalid username format" });
     }
-    const usernameExists = await User.findOne({ username: normalizedUsername });
+
+    const usernameExists = await User.findOne({ username });
     if (usernameExists) {
       return res.status(409).json({ message: "Username already taken" });
     }
@@ -33,12 +29,19 @@ exports.register = async (req, res) => {
     const user = await User.create({
       name,
       email,
-      username: normalizedUsername,
+      username,
       password: hashedPassword
     });
 
+    // 🔐 NEW JWT FORMAT
     const token = jwt.sign(
-      { id: user._id },
+      {
+        iss: "devgram",
+        sub: user._id.toString(),
+        email: user.email,
+        username: user.username,
+        name: user.name
+      },
       process.env.JWT_SECRET,
       { expiresIn: "7d" }
     );
@@ -48,7 +51,8 @@ exports.register = async (req, res) => {
       user: {
         id: user._id,
         name: user.name,
-        username: user.username
+        username: user.username,
+        email: user.email
       }
     });
   } catch (err) {
@@ -74,8 +78,15 @@ exports.login = async (req, res) => {
       return res.status(400).json({ message: "Invalid credentials" });
     }
 
+    // 🔐 NEW JWT FORMAT
     const token = jwt.sign(
-      { id: user._id },
+      {
+        iss: "devgram",
+        sub: user._id.toString(),
+        email: user.email,
+        username: user.username,
+        name: user.name
+      },
       process.env.JWT_SECRET,
       { expiresIn: "7d" }
     );
@@ -86,8 +97,8 @@ exports.login = async (req, res) => {
         id: user._id,
         name: user.name,
         email: user.email,
-        username: user.username,
-      },
+        username: user.username
+      }
     });
   } catch (err) {
     console.error(err);
