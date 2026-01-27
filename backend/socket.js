@@ -12,23 +12,31 @@ const initSocket = (server) => {
   });
 
   io.on("connection", socket => {
-    console.log("Socket connected:", socket.id);
+    // console.log("Socket connected:", socket.id);
 
     // ================= DM =================
     socket.on("joinConversation", conversationId => {
       socket.join(conversationId);
-      console.log("Joined conversation:", conversationId);
+      // console.log("Joined conversation:", conversationId);
     });
 
     // ================= CHANNEL =================
     socket.on("joinChannel", channelId => {
       socket.join(channelId);
-      console.log("Joined channel:", channelId);
+      // console.log("Joined channel:", channelId);
     });
 
-    // 🔥🔥🔥 THIS WAS MISSING 🔥🔥🔥
+    socket.on("leaveChannel", channelId => {
+      socket.leave(channelId);
+    });
+
     socket.on("sendMessage", async ({ channelId, userId, content }) => {
       try {
+        const rooms = [...socket.rooms];
+        if (!rooms.includes(channelId)) {
+          return; // user is not in channel room
+        }
+
         const message = await ChannelMessage.create({
           channel: channelId,
           sender: userId,
@@ -40,7 +48,6 @@ const initSocket = (server) => {
           "name username"
         );
 
-        // emit to everyone in channel
         io.to(channelId).emit("newMessage", populated);
       } catch (err) {
         console.error("Send message error:", err);
@@ -48,7 +55,7 @@ const initSocket = (server) => {
     });
 
     socket.on("disconnect", () => {
-      console.log("Socket disconnected:", socket.id);
+      // console.log("Socket disconnected:", socket.id);
     });
   });
 
