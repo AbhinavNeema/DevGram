@@ -1,7 +1,7 @@
 const Conversation = require("../models/Conversation");
+
 const Message = require("../models/Message");
 const { getIO } = require("../socket");
-
 // exports.sendMessage = async (req, res) => {
 //   const { conversationId, text } = req.body;
 
@@ -68,36 +68,31 @@ exports.getMessages = async (req, res) => {
   res.json(messages);
 };
 
-/* SEND MESSAGE */
+
 exports.sendMessage = async (req, res) => {
   try {
+    const sender = req.userId;
     const { conversationId, text } = req.body;
-
-    if (!conversationId || !text) {
-      return res.status(400).json({ message: "Missing fields" });
-    }
 
     const message = await Message.create({
       conversation: conversationId,
-      sender: req.userId,
+      sender,
       text,
     });
 
-    await Conversation.findByIdAndUpdate(conversationId, {
-      lastMessage: message._id,
-    });
+    const populated = await message.populate(
+      "sender",
+      "name username"
+    );
 
-    const populated = await message.populate("sender", "name");
+    // 🔥 THIS IS THE FIX
+    const io = getIO();
+    io.to(conversationId).emit("newMessage", populated);
 
-    // 🔥 REAL-TIME
-   const io = getIO();
-
-io.to(conversationId).emit("newMessage", message);
-
-    res.json(populated);
+    res.status(201).json(populated);
   } catch (err) {
     console.error("sendMessage error:", err);
-    res.status(500).json({ message: "Server error" });
+    res.status(500).json({ message: "Failed to send message" });
   }
 };
 

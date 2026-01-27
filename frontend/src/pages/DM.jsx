@@ -4,9 +4,7 @@ import api from "../api/axios";
 import { io } from "socket.io-client";
 import toast from "react-hot-toast";
 
-const socket = io("http://localhost:5001", {
-  autoConnect: false,
-});
+import socket from "../socket";
 
 const DM = () => {
   const { conversationId } = useParams();
@@ -14,11 +12,10 @@ const DM = () => {
   const messagesEndRef = useRef(null);
   const editInputRef = useRef(null);
   const sendInputRef = useRef(null);
-
+  const socketRef = useRef(null);
   const token = localStorage.getItem("token");
-  const currentUserId = token
-    ? JSON.parse(atob(token.split(".")[1])).id
-    : null;
+  const payload = token ? JSON.parse(atob(token.split(".")[1])) : null;
+  const currentUserId = payload?.id || payload?.sub || null;
 
   const [inbox, setInbox] = useState([]);
   const [activeConversation, setActiveConversation] = useState(null);
@@ -30,17 +27,18 @@ const DM = () => {
   const [editingText, setEditingText] = useState("");
 
   /* ================= SOCKET CONNECT ONCE ================= */
-  useEffect(() => {
-    if (!socket.connected) {
-      socket.connect();
-    }
+    useEffect(() => {
+      socketRef.current = io("http://localhost:5001", {
+        transports: ["websocket"],
+      });
 
-    return () => {
-      socket.off("newMessage");
-      socket.off("editMessage");
-      socket.off("deleteMessage");
-    };
-  }, []);
+      console.log("Socket connected");
+
+      return () => {
+        socketRef.current.disconnect();
+        console.log("Socket disconnected");
+      };
+    }, []);
 
   /* ================= LOAD INBOX ================= */
   useEffect(() => {
@@ -87,46 +85,32 @@ const DM = () => {
 
     api.put(`/messages/read/${conversationId}`);
     setInbox(prev => prev.map(c => c._id === conversationId ? { ...c, unreadCount: 0 } : c));
-    socket.emit("joinConversation", conversationId);
+    
   }, [conversationId]);
+useEffect(() => {
+  if (!conversationId || !socketRef.current) return;
 
+  socketRef.current.emit("joinConversation", conversationId);
+  console.log("Joined conversation:", conversationId);
+}, [conversationId]);
   /* ================= SOCKET LISTENER ================= */
   useEffect(() => {
-    if (!conversationId) return;
+  if (!socketRef.current) return;
 
-    const handleNewMessage = msg => {
-      setInbox(prev =>
-        prev.map(c => {
-          if (c._id === msg.conversation) {
-            const updated = { ...c, lastMessage: msg };
-            if (msg.sender._id !== currentUserId && msg.conversation !== conversationId) {
-              updated.unreadCount = (updated.unreadCount || 0) + 1;
-            }
-            return updated;
-          }
-          return c;
-        })
-      );
+  const handleNewMessage = msg => {
+    setMessages(prev => {
+      if (prev.some(m => m._id === msg._id)) return prev;
+      return [...prev, msg];
+    });
+    scrollToBottom();
+  };
 
-      if (msg.conversation !== conversationId && msg.sender._id !== currentUserId) {
-        toast.success(`New message from ${msg.sender.name}`);
-        return;
-      }
+  socketRef.current.on("newMessage", handleNewMessage);
 
-      setMessages(prev => {
-        if (prev.some(m => m._id === msg._id)) return prev;
-        return [...prev, msg];
-      });
-
-      scrollToBottom();
-    };
-
-    socket.on("newMessage", handleNewMessage);
-
-    return () => {
-      socket.off("newMessage", handleNewMessage);
-    };
-  }, [conversationId, currentUserId]);
+  return () => {
+    socketRef.current.off("newMessage", handleNewMessage);
+  };
+}, []);
 
   const scrollToBottom = () => {
     setTimeout(() => {
@@ -141,7 +125,13 @@ const DM = () => {
     const msgText = text;
     setText("");
 
-    setInbox(prev => prev.map(c => c._id === conversationId ? { ...c, lastMessage: { text: msgText, sender: { _id: currentUserId } } } : c));
+    setInbox(prev =>
+      prev.map(c =>
+        c._id === conversationId
+          ? { ...c, lastMessage: { text: msgText } }
+          : c
+      )
+    );
 
     try {
       await api.post("/messages/send", {
@@ -227,7 +217,7 @@ const DM = () => {
 
           {inbox.map(conv => {
             const other = conv.participants.find(
-              p => p._id !== currentUserId
+              p => String(p._id) !== String(currentUserId)
             );
 
             const active = conversationId === conv._id;
@@ -287,71 +277,35 @@ const DM = () => {
             )}
 
             {messages.map(msg => {
-              const mine = msg.sender?._id === currentUserId;
-              return (
-                <div key={msg._id} className={`flex ${mine ? "justify-end" : "justify-start"} `}>
-                  <div className={`relative max-w-[75%] flex flex-col ${mine ? "items-end" : "items-start"}`}>
-                    {/* Message bubble or inline editor */}
-                    {editingMessageId === msg._id ? (
-                      <div className="w-full">
-                        <textarea
-                          ref={editInputRef}
-                          value={editingText}
-                          onChange={e => setEditingText(e.target.value)}
-                          rows={2}
-                          className="w-full resize-none rounded-md border border-slate-300 p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
-                        />
-                        <div className="mt-2 flex gap-2 justify-end">
-                          <button
-                            onClick={cancelEdit}
-                            className="px-3 py-1 rounded-md bg-white border text-sm hover:bg-slate-50"
-                          >
-                            Cancel
-                          </button>
-                          <button
-                            onClick={() => saveEdit(msg._id)}
-                            className="px-3 py-1 rounded-md bg-blue-600 text-white text-sm hover:bg-blue-700"
-                          >
-                            Save
-                          </button>
-                        </div>
-                      </div>
-                    ) : (
-                      <div
-                        className={`px-4 py-2 rounded-lg text-sm break-words transition-transform transform ${
-                          mine ? "bg-blue-600 text-white rounded-br-none" : "bg-white border"
-                        } shadow-sm hover:scale-[1.01]`}
-                      >
-                        <div className="whitespace-pre-wrap">{msg.text}</div>
-                        <div className={`mt-1 text-[11px] ${mine ? "text-blue-100" : "text-slate-400"} flex items-center gap-2`}>
-                          <span>{timeShort(msg.createdAt)}</span>
-                        </div>
-                      </div>
-                    )}
+  const mine = msg.sender?._id === currentUserId;
 
-                    {/* Hover actions (edit/delete) for own messages */}
-                    {mine && editingMessageId !== msg._id && (
-                      <div className="absolute -bottom-5 right-0 opacity-0 group-hover:opacity-100 hover:opacity-100 transition-opacity flex gap-2">
-                        <button
-                          onClick={() => startEditMessage(msg)}
-                          className="text-xs text-slate-500 hover:text-blue-600"
-                          title="Edit"
-                        >
-                          Edit
-                        </button>
-                        <button
-                          onClick={() => deleteMessage(msg._id)}
-                          className="text-xs text-red-400 hover:text-red-600"
-                          title="Delete"
-                        >
-                          Delete
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
+  return (
+    <div key={msg._id} className={`flex ${mine ? "justify-end" : "justify-start"}`}>
+      <div className={`relative max-w-[75%] flex flex-col ${mine ? "items-end" : "items-start"}`}>
+
+        {/* ✅ SENDER NAME */}
+        {!mine && (
+          <div className="text-xs text-slate-400 mb-1">
+            {msg.sender?.name}
+          </div>
+        )}
+
+        <div
+          className={`px-4 py-2 rounded-lg text-sm break-words ${
+            mine
+              ? "bg-blue-600 text-white rounded-br-none"
+              : "bg-white border"
+          }`}
+        >
+          {msg.text}
+          <div className="mt-1 text-[11px] text-slate-400">
+            {timeShort(msg.createdAt)}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+})}
 
             <div ref={messagesEndRef} />
           </div>
