@@ -1,5 +1,5 @@
 const { Server } = require("socket.io");
-const ChannelMessage = require("./models/ChannelMessage");
+const ChannelMessage = require("./models/ChannelMessage"); // adjust path
 
 let io;
 
@@ -14,12 +14,20 @@ const initSocket = (server) => {
   io.on("connection", socket => {
     console.log("Socket connected:", socket.id);
 
+    // ================= DM =================
+    socket.on("joinConversation", conversationId => {
+      socket.join(conversationId);
+      console.log("Joined conversation:", conversationId);
+    });
+
+    // ================= CHANNEL =================
     socket.on("joinChannel", channelId => {
       socket.join(channelId);
       console.log("Joined channel:", channelId);
     });
 
-    socket.on("sendMessage", async ({ channelId, content, userId }) => {
+    // 🔥🔥🔥 THIS WAS MISSING 🔥🔥🔥
+    socket.on("sendMessage", async ({ channelId, userId, content }) => {
       try {
         const message = await ChannelMessage.create({
           channel: channelId,
@@ -32,6 +40,7 @@ const initSocket = (server) => {
           "name username"
         );
 
+        // emit to everyone in channel
         io.to(channelId).emit("newMessage", populated);
       } catch (err) {
         console.error("Send message error:", err);
@@ -42,10 +51,14 @@ const initSocket = (server) => {
       console.log("Socket disconnected:", socket.id);
     });
   });
+
+  return io;
 };
 
 const getIO = () => {
-  if (!io) throw new Error("Socket.io not initialized");
+  if (!io) {
+    throw new Error("Socket.io not initialized");
+  }
   return io;
 };
 
