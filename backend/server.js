@@ -21,6 +21,8 @@ app.use("/users", require("./routes/userRoutes"));
 app.use("/blogs", require("./routes/blogRoutes"));
 app.use("/messages", require("./routes/message"));
 app.use("/search",require("./routes/searchRoutes"))
+app.use("/workspaces", require("./routes/workspace"));
+app.use("/channels", require("./routes/Channel"));
 const server = http.createServer(app);
 initSocket(server);
 

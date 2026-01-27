@@ -1,9 +1,11 @@
+// src/api/axios.js
 import axios from "axios";
 
 const api = axios.create({
   baseURL: "http://localhost:5001",
 });
 
+// attach token
 api.interceptors.request.use(config => {
   const token = localStorage.getItem("token");
   if (token) {
@@ -12,12 +14,14 @@ api.interceptors.request.use(config => {
   return config;
 });
 
+// handle auth errors
 api.interceptors.response.use(
-  response => response,
+  res => res,
   error => {
     const status = error.response?.status;
 
-    if (status === 401 || status === 403) {
+    // ❌ REMOVE 403 from here
+    if (status === 401) {
       localStorage.removeItem("token");
       window.location.href = "/login";
     }
