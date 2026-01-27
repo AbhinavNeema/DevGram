@@ -11,7 +11,7 @@ const Navbar = () => {
   try {
     if (token) {
       const decoded = JSON.parse(atob(token.split(".")[1]));
-      userId = decoded.id;
+      userId = decoded.sub;
       userInitial = decoded.name?.[0]?.toUpperCase() || "U";
     }
   } catch {}
@@ -90,7 +90,12 @@ const Navbar = () => {
           >
             Trending
           </Link>
-
+          <Link
+            to="/workspaces"
+            className="text-sm font-medium text-gray-700 hover:text-[#0a66c2]"
+          >
+            Workspaces
+          </Link>
           <Link
             to="/create"
             className="inline-flex items-center gap-2 bg-slate-900 text-white px-4 py-2 rounded-xl text-sm font-bold hover:bg-slate-800 active:scale-95 transition-all shadow-sm shadow-slate-200"

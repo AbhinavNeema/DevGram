@@ -14,6 +14,9 @@ import Trending from "./pages/Trending";
 import ProjectPage from "./pages/ProjectPage";
 import BlogPage from "./pages/BlogPage";
 import DM from "./pages/DM";
+import WorkspaceDashboard from "./pages/workspace/WorkspaceDashboard";
+import WorkspaceInvite from "./pages/workspace/WorkspaceInvite";
+import WorkspacesPage from "./pages/workspace/WorkspacesPage";
 function App() {
   return (
     <AuthProvider>
@@ -21,6 +24,7 @@ function App() {
         <Routes>
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
+          <Route path="/workspace/invite/:workspaceId" element={<WorkspaceInvite />} />
           <Route
             path="/"
             element={
@@ -49,7 +53,28 @@ function App() {
                 </MainLayout>
               </ProtectedRoute>
           }/>
-          
+           <Route
+          path="/workspaces"
+          element={
+            <ProtectedRoute>
+              <MainLayout>
+                <WorkspacesPage />
+              </MainLayout>
+            </ProtectedRoute>
+          }
+        />
+
+        {/* SINGLE WORKSPACE DASHBOARD */}
+        <Route
+          path="/workspace/:id"
+          element={
+            <ProtectedRoute>
+              <MainLayout>
+                <WorkspaceDashboard />
+              </MainLayout>
+            </ProtectedRoute>
+          }
+        />
           <Route
   path="/dm"
   element={

@@ -90,9 +90,9 @@ exports.sendMessage = async (req, res) => {
     const populated = await message.populate("sender", "name");
 
     // 🔥 REAL-TIME
-    getIO()
-      .to(conversationId)
-      .emit("newMessage", populated);
+   const io = getIO();
+
+io.to(conversationId).emit("newMessage", message);
 
     res.json(populated);
   } catch (err) {
