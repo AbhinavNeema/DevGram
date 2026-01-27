@@ -1,9 +1,7 @@
 const Workspace = require("../models/Workspace");
 const User = require("../models/User");
-
-/* CREATE WORKSPACE */
+const Channel = require("../models/Channel"); 
 exports.createWorkspace = async (req, res) => {
-    console.log("AUTH USER:", req.userId);
   try {
     const userId = req.userId;
     const { name, description } = req.body;
@@ -11,13 +9,21 @@ exports.createWorkspace = async (req, res) => {
     const workspace = await Workspace.create({
       name,
       description,
-      owner: req.userId,  
+      owner: userId, // ✅ FIX
       members: [{ user: userId, role: "owner" }],
     });
 
-    res.json(workspace);
+    // default #general channel
+    await Channel.create({
+      name: "general",
+      workspace: workspace._id,
+      members: [userId],
+      createdBy: userId,
+    });
+
+    res.status(201).json(workspace);
   } catch (err) {
-    console.error(err);
+    console.error("Create workspace error:", err);
     res.status(500).json({ message: "Failed to create workspace" });
   }
 };
@@ -166,3 +172,56 @@ async function sendInviteEmail(email, workspaceId) {
   console.log("📧 Sending invite email to:", email);
   // nodemailer / resend / sendgrid logic here
 }
+
+exports.removeMember = async (req, res) => {
+  try {
+    const { workspaceId, targetUserId } = req.params;
+    const requesterId = req.userId;
+
+    const workspace = await Workspace.findById(workspaceId);
+    if (!workspace) {
+      return res.status(404).json({ message: "Workspace not found" });
+    }
+
+    const requester = workspace.members.find(
+      m => m.user.toString() === requesterId
+    );
+
+    const target = workspace.members.find(
+      m => m.user.toString() === targetUserId
+    );
+
+    if (!requester || !target) {
+      return res.status(404).json({ message: "Member not found" });
+    }
+
+    // ❌ Cannot remove owner
+    if (target.role === "owner") {
+      return res.status(403).json({ message: "Cannot remove owner" });
+    }
+
+    // ❌ Admin cannot remove admin
+    if (
+      requester.role === "admin" &&
+      target.role === "admin"
+    ) {
+      return res.status(403).json({ message: "Admins cannot remove admins" });
+    }
+
+    // ❌ Only owner/admin allowed
+    if (!["owner", "admin"].includes(requester.role)) {
+      return res.status(403).json({ message: "Not allowed" });
+    }
+
+    workspace.members = workspace.members.filter(
+      m => m.user.toString() !== targetUserId
+    );
+
+    await workspace.save();
+
+    res.json({ message: "Member removed successfully" });
+  } catch (err) {
+    console.error("Remove member error:", err);
+    res.status(500).json({ message: "Failed to remove member" });
+  }
+};

@@ -16,7 +16,8 @@ import BlogPage from "./pages/BlogPage";
 import DM from "./pages/DM";
 import WorkspaceDashboard from "./pages/workspace/WorkspaceDashboard";
 import WorkspaceInvite from "./pages/workspace/WorkspaceInvite";
-import WorkspacesPage from "./pages/workspace/WorkspacesPage";
+import Workspaces from "./pages/workspace/Workspaces";
+import CreateWorkspace from "./pages/workspace/CreateWorkspace";
 function App() {
   return (
     <AuthProvider>
@@ -58,7 +59,7 @@ function App() {
           element={
             <ProtectedRoute>
               <MainLayout>
-                <WorkspacesPage />
+                <Workspaces />
               </MainLayout>
             </ProtectedRoute>
           }
@@ -66,7 +67,7 @@ function App() {
 
         {/* SINGLE WORKSPACE DASHBOARD */}
         <Route
-          path="/workspace/:id"
+          path="/workspaces/:id"
           element={
             <ProtectedRoute>
               <MainLayout>
@@ -74,6 +75,14 @@ function App() {
               </MainLayout>
             </ProtectedRoute>
           }
+        />
+        <Route
+          path="/workspaces/create"
+          element={<ProtectedRoute>
+              <MainLayout>
+                <CreateWorkspace />
+              </MainLayout>
+            </ProtectedRoute>}
         />
           <Route
   path="/dm"
