@@ -1,5 +1,5 @@
 const { Server } = require("socket.io");
-const ChannelMessage = require("./models/ChannelMessage"); // adjust path
+const ChannelMessage = require("./models/ChannelMessage"); // for DM only
 
 let io;
 
@@ -12,51 +12,45 @@ const initSocket = (server) => {
   });
 
   io.on("connection", socket => {
-    // console.log("Socket connected:", socket.id);
 
     // ================= DM =================
     socket.on("joinConversation", conversationId => {
       socket.join(conversationId);
-      // console.log("Joined conversation:", conversationId);
+    });
+
+    // 🔥 DM MESSAGE (socket owns DM)
+    socket.on("sendDMMessage", async ({ conversationId, senderId, content }) => {
+      try {
+        if (!content || !content.trim()) return;
+
+        const message = await ChannelMessage.create({
+          conversation: conversationId,
+          sender: senderId,
+          type: "text",
+          content: content.trim(),
+        });
+
+        const populated = await message.populate("sender", "name _id");
+
+        io.to(conversationId).emit("newDMMessage", populated);
+      } catch (err) {
+        console.error("Send DM error:", err);
+      }
     });
 
     // ================= CHANNEL =================
     socket.on("joinChannel", channelId => {
       socket.join(channelId);
-      // console.log("Joined channel:", channelId);
     });
 
     socket.on("leaveChannel", channelId => {
       socket.leave(channelId);
     });
 
-    socket.on("sendMessage", async ({ channelId, userId, content }) => {
-      try {
-        const rooms = [...socket.rooms];
-        if (!rooms.includes(channelId)) {
-          return; // user is not in channel room
-        }
+    // ❌ DO NOT CREATE CHANNEL MESSAGES HERE
+    // Channel messages come from controllers via getIO().emit()
 
-        const message = await ChannelMessage.create({
-          channel: channelId,
-          sender: userId,
-          content,
-        });
-
-        const populated = await message.populate(
-          "sender",
-          "name username"
-        );
-
-        io.to(channelId).emit("newMessage", populated);
-      } catch (err) {
-        console.error("Send message error:", err);
-      }
-    });
-
-    socket.on("disconnect", () => {
-      // console.log("Socket disconnected:", socket.id);
-    });
+    socket.on("disconnect", () => {});
   });
 
   return io;
