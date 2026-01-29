@@ -40,7 +40,16 @@ exports.createProject = async (req, res) => {
 
 exports.getProjects = async (req, res) => {
   try {
-    const projects = await Project.find()
+    const { tag } = req.query;
+
+    const query = {};
+
+    // 🔥 FILTER LOGIC
+    if (tag) {
+      query.techStack = tag;
+    }
+
+    const projects = await Project.find(query)
       .populate("owner", "name username")
       .populate("comments.author", "name username")
       .populate("comments.mentions", "username")
@@ -48,7 +57,8 @@ exports.getProjects = async (req, res) => {
       .sort({ createdAt: -1 });
 
     res.json(projects);
-  } catch {
+  } catch (err) {
+    console.error("Get Projects Error:", err);
     res.status(500).json({ message: "Server error" });
   }
 };

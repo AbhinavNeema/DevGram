@@ -63,20 +63,60 @@ const DM = () => {
 
   useEffect(() => {
     const handleNewMessage = msg => {
-      setMessages(prev => (prev.some(m => m._id === msg._id) ? prev : [...prev, msg]));
+      // Ignore echo of optimistic messages without clientId match
+      if (msg.sender?._id === currentUserId && !msg.clientId) return;
+
+      setMessages(prev => {
+        // replace optimistic message
+        if (msg.clientId) {
+          const idx = prev.findIndex(m => m.clientId === msg.clientId);
+          if (idx !== -1) {
+            const copy = [...prev];
+            copy[idx] = msg;
+            return copy;
+          }
+        }
+
+        // dedupe
+        if (prev.some(m => m._id === msg._id)) return prev;
+
+        // only for current conversation
+        if (String(msg.conversation) !== String(conversationId)) return prev;
+
+        return [...prev, msg];
+      });
+
+      // 🔥 UPDATE INBOX (last message + unread)
+      setInbox(prev =>
+        prev.map(c =>
+          String(c._id) === String(msg.conversation)
+            ? {
+                ...c,
+                lastMessage: msg,
+                unreadCount:
+                  String(msg.conversation) === String(conversationId)
+                    ? 0
+                    : (c.unreadCount || 0) + 1,
+              }
+            : c
+        )
+      );
+
       scrollToBottom();
     };
-    socket.on("newMessage", handleNewMessage);
-    socket.on("editMessage", updated => {
+    const handleEditMessage = updated => {
       setMessages(prev => prev.map(m => (m._id === updated._id ? updated : m)));
-    });
-    socket.on("deleteMessage", id => {
+    };
+    const handleDeleteMessage = id => {
       setMessages(prev => prev.filter(m => m._id !== id));
-    });
+    };
+    socket.on("newMessage", handleNewMessage);
+    socket.on("editMessage", handleEditMessage);
+    socket.on("deleteMessage", handleDeleteMessage);
     return () => {
       socket.off("newMessage", handleNewMessage);
-      socket.off("editMessage");
-      socket.off("deleteMessage");
+      socket.off("editMessage", handleEditMessage);
+      socket.off("deleteMessage", handleDeleteMessage);
     };
   }, []);
 
@@ -86,23 +126,35 @@ const DM = () => {
 
   const sendMessage = async () => {
     if (!text.trim() || !conversationId) return;
+
     const msgText = text.trim();
+    const clientId = "c-" + Date.now() + "-" + Math.random().toString(36).slice(2);
+
     setText("");
+
     const optimisticMsg = {
-      _id: "temp-" + Date.now(),
-      conversationId,
+      _id: clientId,
+      clientId,
+      conversation: conversationId,
       content: msgText,
       type: "text",
       sender: { _id: currentUserId },
       createdAt: new Date().toISOString(),
     };
+
     setMessages(prev => [...prev, optimisticMsg]);
     scrollToBottom();
+
     try {
-      const res = await api.post("/messages/send", { conversationId, content: msgText, type: "text" });
-      if (res.data) setMessages(prev => prev.map(m => (m._id === optimisticMsg._id ? res.data : m)));
-    } catch (err) {
+      await api.post("/messages/send", {
+        conversationId,
+        content: msgText,
+        type: "text",
+        clientId,
+      });
+    } catch {
       toast.error("Failed to send message");
+      setMessages(prev => prev.filter(m => m._id !== clientId));
     }
   };
 
@@ -137,13 +189,13 @@ const DM = () => {
   };
 
   const deleteMessage = async id => {
+  try {
+    await api.delete(`/messages/message/${id}`);
     setMessages(prev => prev.filter(m => m._id !== id));
-    try { await api.delete(`/messages/message/${id}`); } 
-    catch (err) { 
-      const res = await api.get(`/messages/${conversationId}`);
-      setMessages(res.data);
-    }
-  };
+  } catch {
+    toast.error("Delete failed");
+  }
+};
 
   const otherUser = activeConversation?.participants?.find(p => p._id !== currentUserId);
   const timeShort = (iso) => iso ? new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "";
@@ -201,7 +253,11 @@ const DM = () => {
                       <span className={`text-sm font-black tracking-tight truncate ${active ? "text-white" : "text-slate-200"}`}>
                         {other?.name}
                       </span>
-                      <span className="text-[9px] font-bold text-slate-500 uppercase tracking-tighter">12:45 PM</span>
+                      <span className="text-[9px] font-bold text-slate-500 uppercase tracking-tighter">
+                        {conv.lastMessage?.createdAt
+                          ? timeShort(conv.lastMessage.createdAt)
+                          : ""}
+                      </span>
                     </div>
                     <p className={`text-xs truncate ${active ? "text-indigo-200" : "text-slate-500"} font-medium`}>
                       {conv.lastMessage?.content || "Transmission pending..."}
