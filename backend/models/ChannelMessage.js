@@ -12,9 +12,21 @@ const channelMessageSchema = new mongoose.Schema(
       ref: "User",
       required: true,
     },
+    type: {
+      type: String,
+      enum: ["text", "image", "file"],
+      default: "text",
+    },
     content: {
       type: String,
-      required: true,
+      required: function () {
+        return this.type !== "system";
+      },
+    },
+     fileMeta: {
+      name: String,
+      size: Number,
+      mime: String,
     },
   },
   { timestamps: true }
