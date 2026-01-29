@@ -18,6 +18,7 @@ import WorkspaceDashboard from "./pages/workspace/WorkspaceDashboard";
 import WorkspaceInvite from "./pages/workspace/WorkspaceInvite";
 import Workspaces from "./pages/workspace/Workspaces";
 import CreateWorkspace from "./pages/workspace/CreateWorkspace";
+import Invite from "./pages/invite/Invite";
 function App() {
   return (
     <AuthProvider>
@@ -26,6 +27,7 @@ function App() {
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/workspace/invite/:workspaceId" element={<WorkspaceInvite />} />
+          <Route path="/invite/:token" element={<Invite />} />
           <Route
             path="/"
             element={

@@ -1,6 +1,8 @@
 const Workspace = require("../models/Workspace");
 const User = require("../models/User");
 const Channel = require("../models/Channel"); 
+const jwt = require("jsonwebtoken");
+const nodemailer = require("nodemailer");
 exports.createWorkspace = async (req, res) => {
   try {
     const userId = req.userId;
@@ -113,32 +115,49 @@ exports.getWorkspaceById = async (req, res) => {
 };
 
 exports.acceptInvite = async (req, res) => {
-  const userId = req.userId;
-  const userEmail = req.user.email;
-  const { workspaceId } = req.params;
+  try {
+    const userId = req.userId;
 
-  const workspace = await Workspace.findById(workspaceId);
-  if (!workspace) return res.status(404).json({ message: "Workspace not found" });
+    // ✅ fetch user to get email
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(401).json({ message: "User not found" });
+    }
 
-  const inviteIndex = workspace.pendingInvites.findIndex(
-    i => i.email === userEmail
-  );
+    const userEmail = user.email;
+    const { workspaceId } = req.params;
 
-  if (inviteIndex === -1) {
-    return res.status(400).json({ message: "No invite found" });
+    const workspace = await Workspace.findById(workspaceId);
+    if (!workspace) {
+      return res.status(404).json({ message: "Workspace not found" });
+    }
+
+    const inviteIndex = workspace.pendingInvites.findIndex(
+      i => i.email === userEmail
+    );
+
+    if (inviteIndex === -1) {
+      return res.status(400).json({ message: "No invite found" });
+    }
+
+    const invite = workspace.pendingInvites[inviteIndex];
+
+    workspace.members.push({
+      user: userId,
+      role: invite.role || "member",
+    });
+
+    workspace.pendingInvites.splice(inviteIndex, 1);
+    await workspace.save();
+
+    res.json({
+      message: "Joined workspace successfully",
+      workspaceId: workspace._id,
+    });
+  } catch (err) {
+    console.error("acceptInvite error:", err);
+    res.status(500).json({ message: "Failed to accept invite" });
   }
-
-  const invite = workspace.pendingInvites[inviteIndex];
-
-  workspace.members.push({
-    user: userId,
-    role: invite.role,
-  });
-
-  workspace.pendingInvites.splice(inviteIndex, 1);
-  await workspace.save();
-
-  res.json({ message: "Joined workspace successfully" });
 };
 
 exports.changeRole = async (req, res) => {
@@ -169,10 +188,81 @@ exports.changeRole = async (req, res) => {
 };
 
 async function sendInviteEmail(email, workspaceId) {
-  console.log("📧 Sending invite email to:", email);
-  // nodemailer / resend / sendgrid logic here
-}
+  // 🔐 create invite token
+  const token = jwt.sign(
+    {
+      email,
+      workspaceId,
+      type: "workspace-invite",
+    },
+    process.env.JWT_SECRET,
+    { expiresIn: "7d" }
+  );
 
+  const inviteLink = `${process.env.FRONTEND_URL}/invite/${token}`;
+
+  // 📮 mail transporter
+  const transporter = nodemailer.createTransport({
+    service: "gmail",
+    auth: {
+      user: process.env.MAIL_USER,
+      pass: process.env.MAIL_PASS,
+    },
+  });
+
+  
+  const html = `
+  <div style="font-family: Inter, Arial, sans-serif; background:#f9fafb; padding:40px">
+    <div style="max-width:520px;margin:auto;background:white;border-radius:12px;padding:32px;border:1px solid #e5e7eb">
+      
+      <h2 style="margin:0 0 12px;color:#111827;">You’re invited to Devgram 🚀</h2>
+      
+      <p style="color:#374151;font-size:15px;">
+        You’ve been invited to join a workspace on <b>Devgram</b>.
+      </p>
+
+      <div style="margin:28px 0;text-align:center">
+        <a href="${inviteLink}"
+           style="
+            display:inline-block;
+            background:#4f46e5;
+            color:white;
+            padding:12px 20px;
+            border-radius:8px;
+            text-decoration:none;
+            font-weight:600;
+           ">
+          Join Workspace
+        </a>
+      </div>
+
+      <p style="color:#6b7280;font-size:13px;">
+        This invitation will expire in <b>7 days</b>.
+        If you weren’t expecting this invite, you can safely ignore this email.
+      </p>
+
+      <hr style="margin:24px 0;border:none;border-top:1px solid #e5e7eb" />
+
+      <p style="color:#9ca3af;font-size:12px;">
+        Devgram • Team collaboration made simple
+      </p>
+    </div>
+  </div>
+  `;
+
+  // 🚀 send mail
+  await transporter.sendMail({
+    from: `"Devgram" <${process.env.MAIL_USER}>`,
+    to: email,
+    subject: "You’re invited to join a Devgram workspace",
+    html,
+  });
+
+  console.log("📧 Invite email sent to:", email);
+  console.log("🔗 Invite link:", inviteLink);
+
+  return inviteLink;
+}
 exports.removeMember = async (req, res) => {
   try {
     const { workspaceId, targetUserId } = req.params;

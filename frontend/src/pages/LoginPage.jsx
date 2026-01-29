@@ -6,7 +6,7 @@ import api from "../api/axios";
 const LoginPage = () => {
   const { login } = useAuth();
   const navigate = useNavigate();
-
+  const redirect = new URLSearchParams(location.search).get("redirect");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -28,7 +28,12 @@ const LoginPage = () => {
       });
 
       login(res.data.token);
-      navigate("/");
+      if (redirect) {
+        navigate(redirect);
+      } else {
+        navigate("/");
+      }
+      
     } catch (err) {
       setError("Invalid email or password");
     } finally {
