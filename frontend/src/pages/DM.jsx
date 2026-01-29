@@ -1,9 +1,7 @@
 import { useEffect, useState, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import api from "../api/axios";
-import { io } from "socket.io-client";
 import toast from "react-hot-toast";
-
 import socket from "../socket";
 
 const DM = () => {
@@ -12,7 +10,7 @@ const DM = () => {
   const messagesEndRef = useRef(null);
   const editInputRef = useRef(null);
   const sendInputRef = useRef(null);
-  const socketRef = useRef(null);
+  const fileInputRef = useRef(null);
   const token = localStorage.getItem("token");
   const payload = token ? JSON.parse(atob(token.split(".")[1])) : null;
   const currentUserId = payload?.id || payload?.sub || null;
@@ -21,24 +19,8 @@ const DM = () => {
   const [activeConversation, setActiveConversation] = useState(null);
   const [messages, setMessages] = useState([]);
   const [text, setText] = useState("");
-
-  // inline edit states
   const [editingMessageId, setEditingMessageId] = useState(null);
   const [editingText, setEditingText] = useState("");
-
-  /* ================= SOCKET CONNECT ONCE ================= */
-    useEffect(() => {
-      socketRef.current = io("http://localhost:5001", {
-        transports: ["websocket"],
-      });
-
-      console.log("Socket connected");
-
-      return () => {
-        socketRef.current.disconnect();
-        console.log("Socket disconnected");
-      };
-    }, []);
 
   /* ================= LOAD INBOX ================= */
   useEffect(() => {
@@ -60,7 +42,11 @@ const DM = () => {
   useEffect(() => {
     socket.on("editMessage", msg => {
       setMessages(prev =>
-        prev.map(m => (m._id === msg._id ? msg : m))
+        prev.map(m => {
+          if (m._id !== msg._id) return m;
+          if (editingMessageId === msg._id) return m; // don’t overwrite local edit
+          return msg;
+        })
       );
     });
 
@@ -88,15 +74,13 @@ const DM = () => {
     
   }, [conversationId]);
 useEffect(() => {
-  if (!conversationId || !socketRef.current) return;
+  if (!conversationId) return;
 
-  socketRef.current.emit("joinConversation", conversationId);
+  socket.emit("joinConversation", conversationId);
   console.log("Joined conversation:", conversationId);
 }, [conversationId]);
   /* ================= SOCKET LISTENER ================= */
   useEffect(() => {
-  if (!socketRef.current) return;
-
   const handleNewMessage = msg => {
     setMessages(prev => {
       if (prev.some(m => m._id === msg._id)) return prev;
@@ -105,10 +89,20 @@ useEffect(() => {
     scrollToBottom();
   };
 
-  socketRef.current.on("newMessage", handleNewMessage);
+  socket.on("newMessage", handleNewMessage);
+  socket.on("editMessage", updated => {
+    setMessages(prev =>
+      prev.map(m => (m._id === updated._id ? updated : m))
+    );
+  });
+  socket.on("deleteMessage", id => {
+    setMessages(prev => prev.filter(m => m._id !== id));
+  });
 
   return () => {
-    socketRef.current.off("newMessage", handleNewMessage);
+    socket.off("newMessage", handleNewMessage);
+    socket.off("editMessage");
+    socket.off("deleteMessage");
   };
 }, []);
 
@@ -122,32 +116,75 @@ useEffect(() => {
   const sendMessage = async () => {
     if (!text.trim() || !conversationId) return;
 
-    const msgText = text;
+    const msgText = text.trim();
     setText("");
 
-    setInbox(prev =>
-      prev.map(c =>
-        c._id === conversationId
-          ? { ...c, lastMessage: { text: msgText } }
-          : c
-      )
-    );
+    const optimisticMsg = {
+      _id: "temp-" + Date.now(),
+      conversationId,
+      content: msgText,
+      type: "text",
+      sender: { _id: currentUserId },
+      createdAt: new Date().toISOString(),
+    };
+
+    setMessages(prev => [...prev, optimisticMsg]);
+    scrollToBottom();
 
     try {
-      await api.post("/messages/send", {
+      const res = await api.post("/messages/send", {
         conversationId,
-        text: msgText,
+        content: msgText,
+        type: "text",
       });
+
+      if (res.data) {
+        setMessages(prev =>
+          prev.map(m => (m._id === optimisticMsg._id ? res.data : m))
+        );
+      }
     } catch (err) {
       console.error("Send message failed", err);
+      toast.error("Failed to send message");
     }
   };
 
+  const sendImage = async (e) => {
+  const file = e.target.files[0];
+  if (!file || !conversationId) return;
+
+  const formData = new FormData();
+  formData.append("image", file);
+
+  try {
+    const res = await api.post(
+      `/messages/dm/${conversationId}/image`,
+      formData,
+      { headers: { "Content-Type": "multipart/form-data" } }
+    );
+
+    // ✅ immediately show image without refresh
+    if (res.data) {
+      setMessages(prev => {
+        if (prev.some(m => m._id === res.data._id)) return prev;
+        return [...prev, res.data];
+      });
+      scrollToBottom();
+    }
+  } catch (err) {
+    console.error("Send image failed", err);
+    toast.error("Failed to send image");
+  }
+
+  e.target.value = null;
+};
+
+
   /* ================= EDIT MESSAGE (open inline editor) ================= */
   const startEditMessage = msg => {
+    if (msg.type === "image") return;
     setEditingMessageId(msg._id);
-    setEditingText(msg.text);
-    // focus will be triggered by effect below
+    setEditingText(msg.content || "");
   };
 
   // focus edit input when editingMessageId changes
@@ -164,7 +201,7 @@ useEffect(() => {
     if (!newText) return;
 
     try {
-      const res = await api.put(`/messages/message/${msgId}`, { text: newText });
+      const res = await api.put(`/messages/message/${msgId}`, { content: newText });
       setMessages(prev => prev.map(m => (m._id === msgId ? res.data : m)));
       setEditingMessageId(null);
       setEditingText("");
@@ -181,8 +218,19 @@ useEffect(() => {
 
   /* ================= DELETE MESSAGE ================= */
   const deleteMessage = async id => {
-    await api.delete(`/messages/message/${id}`);
+    // optimistic UI
     setMessages(prev => prev.filter(m => m._id !== id));
+
+    try {
+      await api.delete(`/messages/message/${id}`);
+    } catch (err) {
+      toast.error("Failed to delete message");
+      // rollback by refetching messages
+      if (conversationId) {
+        const res = await api.get(`/messages/${conversationId}`);
+        setMessages(res.data);
+      }
+    }
   };
 
   const otherUser = activeConversation?.participants?.find(
@@ -243,7 +291,7 @@ useEffect(() => {
                   </div>
 
                   <div className="text-xs text-slate-500 truncate mt-1">
-                    {conv.lastMessage?.text || "No messages yet"}
+                    {conv.lastMessage?.content || "No messages yet"}
                   </div>
                 </div>
 
@@ -297,11 +345,58 @@ useEffect(() => {
               : "bg-white border"
           }`}
         >
-          {msg.text}
+          {msg.type === "image" ? (
+            <img
+              src={msg.content.startsWith("http")
+                ? msg.content
+                : `http://localhost:5001${msg.content}`}
+              alt="sent"
+              className="max-w-[240px] rounded-lg"
+            />
+          ) : (
+            editingMessageId === msg._id ? (
+              <div className="flex flex-col gap-1">
+                <input
+                  ref={editInputRef}
+                  value={editingText}
+                  onChange={e => setEditingText(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === "Enter") saveEdit(msg._id);
+                    if (e.key === "Escape") cancelEdit();
+                  }}
+                  className="text-sm text-black px-2 py-1 rounded border"
+                />
+                <div className="flex gap-2 text-[11px] text-slate-500">
+                  <button onClick={() => saveEdit(msg._id)}>Save</button>
+                  <button onClick={cancelEdit}>Cancel</button>
+                </div>
+              </div>
+            ) : (
+              <span>{msg.content || ""}</span>
+            )
+          )}
           <div className="mt-1 text-[11px] text-slate-400">
             {timeShort(msg.createdAt)}
           </div>
         </div>
+        {mine && (
+          <div className="flex gap-2 mt-1 text-[11px] text-slate-300">
+            {msg.type !== "image" && (
+              <button
+                onClick={() => startEditMessage(msg)}
+                className="hover:text-white"
+              >
+                Edit
+              </button>
+            )}
+            <button
+              onClick={() => deleteMessage(msg._id)}
+              className="hover:text-red-300"
+            >
+              Delete
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -327,6 +422,22 @@ useEffect(() => {
                 rows={1}
                 className="flex-1 resize-none rounded-md border border-slate-300 p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
               />
+
+              <input
+                type="file"
+                accept="image/*"
+                ref={fileInputRef}
+                hidden
+                onChange={sendImage}
+              />
+
+              <button
+                type="button"
+                onClick={() => fileInputRef.current.click()}
+                className="p-2 rounded-md hover:bg-slate-100"
+              >
+                📷
+              </button>
 
               <button
                 onClick={sendMessage}

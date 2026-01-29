@@ -1,5 +1,5 @@
 const Conversation = require("../models/Conversation");
-
+const cloudinary = require("../utils/cloudinary");
 const Message = require("../models/Message");
 const { getIO } = require("../socket");
 // exports.sendMessage = async (req, res) => {
@@ -71,27 +71,31 @@ exports.getMessages = async (req, res) => {
 
 exports.sendMessage = async (req, res) => {
   try {
-    const sender = req.userId;
-    const { conversationId, text } = req.body;
+    const { conversationId, content, type = "text" } = req.body;
+    const senderId = req.userId;
+
+    if (!content || !content.trim()) {
+      return res.status(400).json({ message: "Message content required" });
+    }
 
     const message = await Message.create({
       conversation: conversationId,
-      sender,
-      text,
+      sender: senderId,
+      content: content.trim(),   // ✅ FORCE TRIM
+      type,
     });
 
-    const populated = await message.populate(
-      "sender",
-      "name username"
-    );
+    // 🔥 IMPORTANT: populate BEFORE emitting
+    const populatedMessage = await Message.findById(message._id)
+      .populate("sender", "name _id");
 
-    // 🔥 THIS IS THE FIX
+    
     const io = getIO();
-    io.to(conversationId).emit("newMessage", populated);
+    io.to(conversationId).emit("newMessage", populatedMessage);
 
-    res.status(201).json(populated);
+    res.status(201).json(populatedMessage);
   } catch (err) {
-    console.error("sendMessage error:", err);
+    console.error("Send message error:", err);
     res.status(500).json({ message: "Failed to send message" });
   }
 };
@@ -148,13 +152,73 @@ exports.deleteMessage = async (req, res) => {
 };
 
 exports.editMessage = async (req, res) => {
-  const msg = await Message.findByIdAndUpdate(
-    req.params.id,
-    { text: req.body.text },
-    { new: true }
-  ).populate("sender", "name");
+  try {
+    const { content } = req.body;
 
-  getIO().to(msg.conversation.toString()).emit("editMessage", msg);
+    if (!content || !content.trim()) {
+      return res.status(400).json({ message: "Message content required" });
+    }
 
-  res.json(msg);
+    const msg = await Message.findByIdAndUpdate(
+      req.params.id,
+      { content: content.trim() },   // ✅ FIX
+      { new: true }
+    ).populate("sender", "name _id");
+
+    if (!msg) {
+      return res.status(404).json({ message: "Message not found" });
+    }
+
+    // 🔥 realtime update
+    getIO().to(msg.conversation.toString()).emit("editMessage", msg);
+
+    res.json(msg);
+  } catch (err) {
+    console.error("Edit message error:", err);
+    res.status(500).json({ message: "Failed to edit message" });
+  }
+};
+exports.sendDMImage = async (req, res) => {
+  try {
+    const senderId = req.userId;
+    const { conversationId } = req.params;
+
+    if (!req.file) {
+      return res.status(400).json({ message: "No image uploaded" });
+    }
+
+    const message = await Message.create({
+      sender: senderId,
+      conversation: conversationId,
+      type: "image",
+      content: req.file.path,              // ✅ cloud url
+      cloudinaryId: req.file.filename,     // ✅ public_id
+    });
+
+    const populated = await message.populate("sender", "name _id");
+
+    getIO().to(conversationId).emit("newMessage", populated);
+
+    res.status(201).json(populated);
+  } catch (err) {
+    console.error("sendDMImage error:", err);
+    res.status(500).json({ message: "Failed to send image" });
+  }
+};
+
+exports.deleteMessage = async (req, res) => {
+  const msg = await Message.findById(req.params.id);
+
+  if (!msg) return res.status(404).json({ message: "Not found" });
+
+  // 🔥 delete image from cloud
+  if (msg.type === "image" && msg.cloudinaryId) {
+    await cloudinary.uploader.destroy(msg.cloudinaryId);
+  }
+
+  await msg.deleteOne();
+
+  getIO().to(msg.conversation.toString()).emit("deleteMessage", msg._id);
+
+  res.json({ success: true });
 };

@@ -12,9 +12,11 @@ const messageSchema = new mongoose.Schema(
       ref: "User",
       required: true,
     },
-    text: {
+    content: { type: String },
+    type: {
       type: String,
-      required: true,
+      enum: ["text", "image"],
+      default: "text",
     },
     readBy: [
       {
