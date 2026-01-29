@@ -149,7 +149,21 @@ exports.acceptInvite = async (req, res) => {
 
     workspace.pendingInvites.splice(inviteIndex, 1);
     await workspace.save();
+    const generalChannel = await Channel.findOne({
+  workspace: workspaceId,
+  name: "general",
+});
 
+if (generalChannel) {
+  const alreadyInChannel = generalChannel.members.some(
+    memberId => memberId.toString() === userId.toString()
+  );
+
+  if (!alreadyInChannel) {
+    generalChannel.members.push(userId);
+    await generalChannel.save();
+  }
+}
     res.json({
       message: "Joined workspace successfully",
       workspaceId: workspace._id,
@@ -274,15 +288,20 @@ exports.removeMember = async (req, res) => {
     }
 
     const requester = workspace.members.find(
-      m => m.user.toString() === requesterId
+      m => m.user.toString() === requesterId.toString()
     );
 
     const target = workspace.members.find(
-      m => m.user.toString() === targetUserId
+      m => m.user.toString() === targetUserId.toString()
     );
 
     if (!requester || !target) {
       return res.status(404).json({ message: "Member not found" });
+    }
+
+    // ❌ Cannot remove yourself
+    if (requesterId.toString() === targetUserId.toString()) {
+      return res.status(403).json({ message: "You cannot remove yourself" });
     }
 
     // ❌ Cannot remove owner
@@ -291,10 +310,7 @@ exports.removeMember = async (req, res) => {
     }
 
     // ❌ Admin cannot remove admin
-    if (
-      requester.role === "admin" &&
-      target.role === "admin"
-    ) {
+    if (requester.role === "admin" && target.role === "admin") {
       return res.status(403).json({ message: "Admins cannot remove admins" });
     }
 
@@ -303,11 +319,17 @@ exports.removeMember = async (req, res) => {
       return res.status(403).json({ message: "Not allowed" });
     }
 
+    // ✅ Remove from workspace
     workspace.members = workspace.members.filter(
-      m => m.user.toString() !== targetUserId
+      m => m.user.toString() !== targetUserId.toString()
     );
-
     await workspace.save();
+
+    // ✅ Remove from ALL channels of this workspace
+    await Channel.updateMany(
+      { workspace: workspaceId },
+      { $pull: { members: targetUserId } }
+    );
 
     res.json({ message: "Member removed successfully" });
   } catch (err) {
