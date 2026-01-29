@@ -4,15 +4,24 @@ import { Link, useNavigate } from "react-router-dom";
 import { timeAgo } from "../utils/timeAgo";
 import { renderMentions } from "../utils/renderMentions.jsx";
 import MentionInput from "../components/MentionInput";
+import { 
+  Heart, 
+  MessageCircle, 
+  Eye, 
+  Share2, 
+  Edit3, 
+  Trash2, 
+  MoreHorizontal,
+  ExternalLink,
+  Code2
+} from "lucide-react";
 
 const ProjectCard = ({ project, showOwnerActions = false }) => {
   const navigate = useNavigate();
   const token = localStorage.getItem("token");
   const userId = JSON.parse(atob(token.split(".")[1])).id;
 
-  const isOwner =
-    project.owner?._id === userId || project.owner === userId;
-
+  const isOwner = project.owner?._id === userId || project.owner === userId;
   const description = project.description || "";
 
   const [likesCount, setLikesCount] = useState(project.likes?.length || 0);
@@ -33,235 +42,235 @@ const ProjectCard = ({ project, showOwnerActions = false }) => {
     setCopied(true);
     setTimeout(() => setCopied(false), 1500);
   };
+
   const addView = async () => {
-  if (viewed) return;
-  try {
-    const res = await api.post(`/projects/${project._id}/view`);
-    setViews(res.data.views);
-    setViewed(true);
-  } catch {}
-};
+    if (viewed) return;
+    try {
+      const res = await api.post(`/projects/${project._id}/view`);
+      setViews(res.data.views);
+      setViewed(true);
+    } catch {}
+  };
 
   const handleLike = async () => {
-  addView();
-  const res = await api.put(`/projects/${project._id}/like`);
-  setLiked(res.data.liked);
-  setLikesCount(res.data.likesCount);
-};
+    addView();
+    const res = await api.put(`/projects/${project._id}/like`);
+    setLiked(res.data.liked);
+    setLikesCount(res.data.likesCount);
+  };
 
   const addComment = async () => {
-  if (!text.trim()) return;
-
-  const res = await api.post(`/projects/${project._id}/comments`, {
-    text,
-    mentions: commentMentions.map(u => u._id)
-  });
-
-  setComments([...comments, res.data]);
-  setText("");
-  setCommentMentions([]);
-};
+    if (!text.trim()) return;
+    const res = await api.post(`/projects/${project._id}/comments`, {
+      text,
+      mentions: commentMentions.map(u => u._id)
+    });
+    setComments([...comments, res.data]);
+    setText("");
+    setCommentMentions([]);
+  };
 
   const deleteComment = async (commentId) => {
-  await api.delete(`/projects/${project._id}/comments/${commentId}`);
-  setComments(comments.filter(c => c._id !== commentId));
-};
+    await api.delete(`/projects/${project._id}/comments/${commentId}`);
+    setComments(comments.filter(c => c._id !== commentId));
+  };
 
   const deleteProject = async () => {
-  if (!window.confirm("Delete this project?")) return;
-  await api.delete(`/projects/${project._id}`);
-  window.location.reload();
-};
+    if (!window.confirm("Delete this project?")) return;
+    await api.delete(`/projects/${project._id}`);
+    window.location.reload();
+  };
 
   return (
-  <div className="bg-white border border-gray-200 rounded-xl mb-6 transition-all duration-300 hover:shadow-xl hover:-translate-y-[2px]">
-    
-    {/* HEADER */}
-    <div className="flex gap-3 px-5 pt-5">
-      <div className="w-11 h-11 rounded-full bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center font-semibold text-white shadow">
-        {project.owner?.name?.[0] || "U"}
-      </div>
+    <div className="group bg-[#0F111A] border border-white/10 rounded-[32px] mb-8 overflow-hidden transition-all duration-500 hover:border-indigo-500/40 hover:shadow-[0_20px_50px_rgba(0,0,0,0.5)]">
+      
+      {/* HEADER */}
+      <div className="flex items-center justify-between px-6 py-5 bg-white/[0.02] border-b border-white/5">
+        <div className="flex items-center gap-4">
+          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center font-black text-white text-lg shadow-lg">
+            {project.owner?.name?.[0] || "U"}
+          </div>
 
-      <div className="flex-1">
-        <Link
-          to={`/user/${project.owner?._id}`}
-          className="text-sm font-semibold hover:underline"
-        >
-          {project.owner?.name}
-        </Link>
-        <p className="text-xs text-gray-500">
-          Posted · {timeAgo(project.createdAt)}
-        </p>
-      </div>
-
-      <div className="text-xs flex items-center gap-4">
-        <button
-          onClick={handleShare}
-          className="text-blue-600 hover:text-blue-700 transition font-medium"
-        >
-          {copied ? "Copied ✓" : "Share"}
-        </button>
-
-        {isOwner && showOwnerActions && (
-          <>
-            <button
-              onClick={() => navigate(`/projects/${project._id}/edit`)}
-              className="hover:text-blue-600 transition"
+          <div>
+            <Link
+              to={`/user/${project.owner?._id}`}
+              className="text-sm font-black text-white hover:text-indigo-400 transition-colors tracking-tight"
             >
-              Edit
-            </button>
-            <button
-              onClick={deleteProject}
-              className="text-red-500 hover:text-red-600 transition"
-            >
-              Delete
-            </button>
-          </>
-        )}
-      </div>
-    </div>
+              {project.owner?.name}
+            </Link>
+            <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mt-0.5">
+              Deployed · {timeAgo(project.createdAt)}
+            </p>
+          </div>
+        </div>
 
-    {/* CONTENT */}
-    <div className="px-5 mt-3">
-      <h3 className="font-semibold text-base">{project.title}</h3>
-
-      <p className="text-sm text-gray-700 mt-1 leading-relaxed">
-        {expanded || description.length <= 180
-          ? renderMentions(description, project.mentions)
-          : renderMentions(description.slice(0, 180) + "...", project.mentions)}
-
-        {description.length > 180 && (
+        <div className="flex items-center gap-2">
           <button
-            onClick={() => {
-              setExpanded(!expanded);
-              addView();
-            }}
-            className="ml-1 text-blue-600 font-medium hover:underline"
+            onClick={handleShare}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${
+              copied ? "bg-emerald-500 text-white" : "bg-white/5 text-slate-300 hover:bg-white/10"
+            }`}
           >
-            {expanded ? "Read less" : "Read more"}
+            {copied ? "Link Copied" : <><Share2 className="w-3.5 h-3.5" /> Share</>}
           </button>
-        )}
-      </p>
-    </div>
 
-    {/* IMAGES */}
-    {project.images?.length > 0 && (
-      <div className="px-5 mt-4 grid grid-cols-2 gap-3">
-        {project.images.map((img, i) => (
-          <div
-            key={i}
-            className="overflow-hidden rounded-lg cursor-pointer group"
-            onClick={() => {
-              addView();
-              setActiveImage(img.url);
-            }}
-          >
-            <img
-              src={img.url}
-              className="h-52 w-full object-cover transition-transform duration-300 group-hover:scale-105"
-            />
-          </div>
-        ))}
+          {isOwner && showOwnerActions && (
+            <div className="flex gap-1 ml-2">
+              <button onClick={() => navigate(`/projects/${project._id}/edit`)} className="p-2 text-slate-400 hover:text-indigo-400 transition-colors">
+                <Edit3 className="w-4 h-4" />
+              </button>
+              <button onClick={deleteProject} className="p-2 text-slate-400 hover:text-rose-500 transition-colors">
+                <Trash2 className="w-4 h-4" />
+              </button>
+            </div>
+          )}
+        </div>
       </div>
-    )}
 
-    {/* TAGS */}
-    <div className="px-5 mt-4 flex gap-2 flex-wrap">
-      {(project.techStack || []).map(tag => (
-        <Link
-          key={tag}
-          to={`/?tag=${encodeURIComponent(tag)}`}
-          className="text-xs px-3 py-1 rounded-full bg-blue-50 text-blue-600 hover:bg-blue-100 transition"
-        >
-          #{tag}
-        </Link>
-      ))}
-    </div>
+      {/* CONTENT BODY */}
+      <div className="px-6 py-6">
+        <h3 className="text-xl font-black text-white mb-3 tracking-tighter leading-tight">
+          {project.title}
+        </h3>
 
-    {/* ACTION BAR */}
-    <div className="px-5 mt-4 flex gap-6 text-sm text-gray-600 border-t pt-3">
-      <button
-        onClick={handleLike}
-        className="flex items-center gap-1 hover:text-red-500 transition"
-      >
-        ❤️ <span className={liked ? "font-semibold text-red-500" : ""}>{likesCount}</span>
-      </button>
-      <span className="flex items-center gap-1">💬 {comments.length}</span>
-      <span className="flex items-center gap-1">👀 {views}</span>
-    </div>
+        <div className="text-[15px] text-slate-300 font-medium leading-relaxed mb-6">
+          {expanded || description.length <= 180
+            ? renderMentions(description, project.mentions)
+            : renderMentions(description.slice(0, 180) + "...", project.mentions)}
 
-    {/* COMMENTS */}
-    <div className="px-5 py-4 text-sm border-t bg-gray-50 rounded-b-xl">
-      {!showAllComments && comments.length > 0 && (
-        <>
-          <div className="mb-1">
-            <b>{comments[0].author?.name}</b>{" "}
-            {renderMentions(comments[0].text, comments[0].mentions)}
-          </div>
-          {comments.length > 1 && (
+          {description.length > 180 && (
             <button
-              onClick={() => setShowAllComments(true)}
-              className="text-xs text-blue-600 hover:underline"
+              onClick={() => { setExpanded(!expanded); addView(); }}
+              className="ml-2 text-indigo-400 font-black hover:text-indigo-300 underline underline-offset-4 decoration-2"
             >
-              View all {comments.length} comments
+              {expanded ? "Collapse" : "Expand Brief"}
             </button>
           )}
-        </>
-      )}
+        </div>
 
-      {showAllComments &&
-        comments.map(c => (
-          <div key={c._id} className="flex justify-between py-1">
-            <span>
-              <b>{c.author?.name}</b>{" "}
-              {renderMentions(c.text, c.mentions)}
-            </span>
-            {String(c.author?._id) === String(userId) && (
-              <button
-                onClick={() => deleteComment(c._id)}
-                className="text-red-500 text-xs hover:underline"
+        {/* IMAGE GRID */}
+        {project.images?.length > 0 && (
+          <div className={`grid gap-4 mb-6 ${project.images.length === 1 ? 'grid-cols-1' : 'grid-cols-2'}`}>
+            {project.images.map((img, i) => (
+              <div
+                key={i}
+                className="relative aspect-video overflow-hidden rounded-[24px] border border-white/5 cursor-zoom-in group/img"
+                onClick={() => { addView(); setActiveImage(img.url); }}
               >
-                Delete
-              </button>
-            )}
+                <div className="absolute inset-0 bg-indigo-600/20 opacity-0 group-hover/img:opacity-100 transition-opacity z-10 flex items-center justify-center">
+                  <ExternalLink className="w-8 h-8 text-white" />
+                </div>
+                <img
+                  src={img.url}
+                  className="w-full h-full object-cover transition-transform duration-700 group-hover/img:scale-110"
+                />
+              </div>
+            ))}
           </div>
-        ))}
+        )}
 
-      {/* COMMENT INPUT */}
-      <div className="flex gap-2 mt-3">
-  <MentionInput
-    value={text}
-    onChange={setText}
-    onMentionsChange={setCommentMentions}
-    placeholder="Add a comment… @username"
-    rows={1}
-    className="py-2 text-sm"
-  />
-  <button
-    onClick={addComment}
-    className="px-4 h-9 rounded-md bg-blue-600 text-white hover:bg-blue-700 transition font-medium"
-  >
-    Post
-  </button>
-</div>
+        {/* TAGS */}
+        <div className="flex gap-2 flex-wrap mb-8">
+          {(project.techStack || []).map(tag => (
+            <Link
+              key={tag}
+              to={`/?tag=${encodeURIComponent(tag)}`}
+              className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest px-4 py-2 rounded-full bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 hover:bg-indigo-500 hover:text-white transition-all"
+            >
+              <Code2 className="w-3 h-3" />
+              {tag}
+            </Link>
+          ))}
+        </div>
 
-
-    </div>
-
-    {/* IMAGE MODAL */}
-    {activeImage && (
-      <div
-        className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50"
-        onClick={() => setActiveImage(null)}
-      >
-        <img
-          src={activeImage}
-          className="max-w-[90%] max-h-[90%] rounded-xl shadow-2xl"
-        />
+        {/* INTERACTION BAR */}
+        <div className="flex gap-8 items-center pt-6 border-t border-white/5 text-slate-400">
+          <button
+            onClick={handleLike}
+            className={`flex items-center gap-2 font-black text-xs transition-colors group/btn ${liked ? "text-rose-500" : "hover:text-rose-500"}`}
+          >
+            <Heart className={`w-5 h-5 transition-transform ${liked ? "fill-current scale-110" : "group-hover/btn:scale-110"}`} />
+            {likesCount}
+          </button>
+          <div className="flex items-center gap-2 font-black text-xs">
+            <MessageCircle className="w-5 h-5" />
+            {comments.length}
+          </div>
+          <div className="flex items-center gap-2 font-black text-xs">
+            <Eye className="w-5 h-5" />
+            {views}
+          </div>
+        </div>
       </div>
-    )}
-  </div>
-);
+
+      {/* COMMENTS SECTION */}
+      <div className="bg-black/20 border-t border-white/5 p-6">
+        <div className="space-y-4 mb-6">
+          {!showAllComments && comments.length > 0 && (
+            <div className="flex items-start justify-between gap-4">
+              <div className="text-sm font-medium text-slate-300">
+                <span className="font-black text-indigo-400 mr-2 uppercase tracking-tighter">{comments[0].author?.name}</span>
+                {renderMentions(comments[0].text, comments[0].mentions)}
+              </div>
+              {comments.length > 1 && (
+                <button
+                  onClick={() => setShowAllComments(true)}
+                  className="text-[10px] font-black text-slate-500 uppercase tracking-widest hover:text-white transition-colors"
+                >
+                  +{comments.length - 1} More
+                </button>
+              )}
+            </div>
+          )}
+
+          {showAllComments &&
+            comments.map(c => (
+              <div key={c._id} className="flex items-start justify-between group/comm py-1">
+                <div className="text-sm font-medium text-slate-300">
+                   <span className="font-black text-indigo-400 mr-2 uppercase tracking-tighter">{c.author?.name}</span>
+                   {renderMentions(c.text, c.mentions)}
+                </div>
+                {String(c.author?._id) === String(userId) && (
+                  <button onClick={() => deleteComment(c._id)} className="opacity-0 group-hover/comm:opacity-100 text-rose-500 transition-opacity">
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+            ))}
+        </div>
+
+        {/* INPUT */}
+        <div className="flex gap-3">
+          <div className="flex-1 bg-[#1A1D26] border border-white/10 rounded-2xl px-4 py-1 focus-within:border-indigo-500/50 transition-all">
+            <MentionInput
+              value={text}
+              onChange={setText}
+              onMentionsChange={setCommentMentions}
+              placeholder="System log... @user"
+              rows={1}
+              className="py-3 text-sm text-white placeholder:text-slate-600 font-medium"
+            />
+          </div>
+          <button
+            onClick={addComment}
+            className="px-6 rounded-2xl bg-indigo-600 text-white font-black text-xs uppercase tracking-widest hover:bg-indigo-500 transition-all shadow-lg shadow-indigo-600/20 active:scale-95"
+          >
+            Post
+          </button>
+        </div>
+      </div>
+
+      {/* FULL-SCREEN IMAGE MODAL */}
+      {activeImage && (
+        <div
+          className="fixed inset-0 bg-black/95 backdrop-blur-xl flex items-center justify-center z-[100] animate-in fade-in duration-300"
+          onClick={() => setActiveImage(null)}
+        >
+          <img src={activeImage} className="max-w-[95%] max-h-[90vh] rounded-2xl shadow-[0_0_50px_rgba(79,70,229,0.2)] object-contain" />
+        </div>
+      )}
+    </div>
+  );
 };
 
 export default ProjectCard;

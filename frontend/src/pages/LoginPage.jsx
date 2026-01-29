@@ -1,12 +1,15 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import api from "../api/axios";
+import { Lock, Mail, Loader2, ArrowRight, ShieldCheck } from "lucide-react";
 
 const LoginPage = () => {
   const { login } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const redirect = new URLSearchParams(location.search).get("redirect");
+  
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -14,7 +17,7 @@ const LoginPage = () => {
 
   const submit = async () => {
     if (!email || !password) {
-      setError("Please fill all fields");
+      setError("Authorization credentials required");
       return;
     }
 
@@ -22,101 +25,113 @@ const LoginPage = () => {
     setError("");
 
     try {
-      const res = await api.post("/auth/login", {
-        email,
-        password,
-      });
-
+      const res = await api.post("/auth/login", { email, password });
       login(res.data.token);
-      if (redirect) {
-        navigate(redirect);
-      } else {
-        navigate("/");
-      }
-      
+      navigate(redirect || "/");
     } catch (err) {
-      setError("Invalid email or password");
+      setError("Identity verification failed. Invalid credentials.");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center
-                    bg-gradient-to-br from-blue-50 via-white to-indigo-50 px-4">
+    <div className="min-h-screen flex items-center justify-center bg-[#050505] px-4 relative overflow-hidden">
+      
+      {/* AMBIENT BACKGROUND GLOW */}
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-indigo-600/10 blur-[120px] pointer-events-none" />
 
-      <div className="bg-white border rounded-2xl w-full max-w-md p-8
-                      shadow-sm hover:shadow-md transition-all">
-
-        {/* Logo / Brand */}
-        <div className="flex justify-center mb-4">
-          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-600 to-indigo-600
-                          flex items-center justify-center text-white font-bold text-lg shadow">
-            D
+      <div className="relative bg-[#0F111A] border border-white/10 w-full max-w-md p-10 rounded-[40px] shadow-2xl animate-in fade-in zoom-in duration-500">
+        
+        {/* BRANDING */}
+        <div className="flex justify-center mb-8">
+          <div className="relative group">
+            <div className="absolute -inset-1 bg-indigo-500 rounded-2xl blur opacity-25 group-hover:opacity-50 transition duration-1000"></div>
+            <div className="relative w-16 h-16 rounded-2xl bg-indigo-600 flex items-center justify-center text-white font-black text-2xl shadow-xl transform group-hover:rotate-3 transition-transform">
+              D
+            </div>
           </div>
         </div>
 
-        <h2 className="text-2xl font-semibold text-center text-gray-900 mb-1">
-          Sign in to DevGram
-        </h2>
-
-        <p className="text-sm text-gray-500 text-center mb-6">
-          Build. Share. Connect with developers.
-        </p>
+        <div className="text-center mb-10">
+          <h2 className="text-3xl font-black text-white tracking-tighter mb-2">
+            System Login
+          </h2>
+          <p className="text-xs font-bold text-slate-500 uppercase tracking-[0.2em]">
+            Access your developer terminal
+          </p>
+        </div>
 
         {error && (
-          <div className="bg-red-50 border border-red-100 text-red-600
-                          text-sm px-4 py-2 rounded-lg mb-4">
+          <div className="bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs font-bold px-4 py-3 rounded-xl mb-6 flex items-center gap-3">
+            <div className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse" />
             {error}
           </div>
         )}
 
-        {/* Email */}
-        <input
-          type="email"
-          placeholder="Email"
-          className="w-full border rounded-lg px-4 py-2 mb-3 text-sm
-                     focus:outline-none focus:ring-2 focus:ring-blue-500
-                     focus:border-blue-500 transition"
-          value={email}
-          onChange={e => setEmail(e.target.value)}
-        />
+        {/* INPUTS */}
+        <div className="space-y-4">
+          <div className="relative group">
+            <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-indigo-400 transition-colors">
+              <Mail className="w-4 h-4" />
+            </div>
+            <input
+              type="email"
+              placeholder="Email Address"
+              className="w-full bg-[#161925] border-2 border-white/5 rounded-2xl pl-12 pr-4 py-4 text-sm text-white font-bold placeholder:text-slate-700 focus:outline-none focus:border-indigo-500/50 transition-all shadow-inner"
+              value={email}
+              onChange={e => setEmail(e.target.value)}
+            />
+          </div>
 
-        {/* Password */}
-        <input
-          type="password"
-          placeholder="Password"
-          className="w-full border rounded-lg px-4 py-2 mb-4 text-sm
-                     focus:outline-none focus:ring-2 focus:ring-blue-500
-                     focus:border-blue-500 transition"
-          value={password}
-          onChange={e => setPassword(e.target.value)}
-        />
+          <div className="relative group">
+            <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-indigo-400 transition-colors">
+              <Lock className="w-4 h-4" />
+            </div>
+            <input
+              type="password"
+              placeholder="Security Key"
+              className="w-full bg-[#161925] border-2 border-white/5 rounded-2xl pl-12 pr-4 py-4 text-sm text-white font-bold placeholder:text-slate-700 focus:outline-none focus:border-indigo-500/50 transition-all shadow-inner"
+              value={password}
+              onChange={e => setPassword(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && submit()}
+            />
+          </div>
+        </div>
         
-        {/* Button */}
+        {/* SUBMIT */}
         <button
           onClick={submit}
           disabled={loading}
-          className={`w-full py-2.5 rounded-lg text-sm font-medium transition
-            ${loading
-              ? "bg-blue-400 cursor-not-allowed"
-              : "bg-blue-600 hover:bg-blue-700 shadow-sm hover:shadow"
-            }
-            text-white`}
+          className="w-full mt-8 relative overflow-hidden group bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white py-4 rounded-2xl font-black text-sm uppercase tracking-[0.2em] shadow-[0_20px_40px_-10px_rgba(79,70,229,0.4)] transition-all active:scale-[0.98] flex items-center justify-center gap-3"
         >
-          {loading ? "Signing in…" : "Sign In"}
+          {loading ? (
+            <Loader2 className="w-5 h-5 animate-spin" />
+          ) : (
+            <>
+              Authorize Access
+              <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+            </>
+          )}
         </button>
 
-        {/* Footer */}
-        <p className="text-sm text-center text-gray-600 mt-5">
-          New to DevGram?{" "}
-          <Link
-            to="/register"
-            className="text-blue-600 hover:text-blue-700 hover:underline font-medium"
-          >
-            Join now
-          </Link>
-        </p>
+        {/* FOOTER */}
+        <div className="mt-10 pt-8 border-t border-white/5 flex flex-col items-center gap-4">
+          <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">
+            First time deploying here?{" "}
+            <Link
+              to="/register"
+              className="text-indigo-400 hover:text-white transition-colors"
+            >
+              Initialize Account
+            </Link>
+          </p>
+          
+          <div className="flex items-center gap-2 opacity-30">
+            <ShieldCheck className="w-3 h-3 text-slate-400" />
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Secure Handshake Protocol</span>
+          </div>
+        </div>
       </div>
     </div>
   );
