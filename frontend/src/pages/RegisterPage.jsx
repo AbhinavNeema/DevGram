@@ -6,7 +6,7 @@ import { useAuth } from "../context/AuthContext";
 const RegisterPage = () => {
   const { login } = useAuth();
   const navigate = useNavigate();
-
+  const redirect = new URLSearchParams(location.search).get("redirect");
   const [name, setName] = useState("");
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
@@ -38,7 +38,11 @@ const RegisterPage = () => {
       });
 
       login(res.data.token);
-      navigate("/");
+      if (redirect) {
+        navigate(redirect);
+      } else {
+        navigate("/");
+      }
     } catch (err) {
       setError(err.response?.data?.message || "Registration failed");
     } finally {
