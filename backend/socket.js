@@ -6,7 +6,10 @@ let io;
 const initSocket = (server) => {
   io = new Server(server, {
     cors: {
-      origin: process.env.FRONTEND_URL,
+      origin: [
+        "http://localhost:5173",
+        process.env.FRONTEND_URL,
+      ],
       credentials: true,
     },
   });
