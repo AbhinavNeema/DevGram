@@ -2,23 +2,18 @@ import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import api from "../api/axios";
 import ProjectCard from "../components/ProjectCard";
-import { Filter, Layers, Zap, X, Terminal, Loader2, Sparkles, Cpu, Activity } from "lucide-react";
-
-const TAGS = [
-  { label: "React", value: "react" },
-  { label: "Nodejs", value: "nodejs" },
-  { label: "MongoDB", value: "mongodb" },
-  { label: "ML", value: "machine-learning" },
-  { label: "AI", value: "ai" },
-  { label: "NextJS", value: "nextjs" },
-];
+import BlogCard from "../components/BlogCard";
+import TAGS from "../constants/TAGS";
+import { Filter, Layers, Zap, Terminal, Loader2, Activity } from "lucide-react";
 
 const ProjectsPage = () => {
-  const [projects, setProjects] = useState([]);
+  const [feed, setFeed] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showFilters, setShowFilters] = useState(false);
   const [searchParams, setSearchParams] = useSearchParams();
   const activeTag = searchParams.get("tag");
+  const [typeFilter, setTypeFilter] = useState("all");
+  const [search, setSearch] = useState("");
 
   // Animation States
   const [isFirstHit, setIsFirstHit] = useState(false);
@@ -43,35 +38,40 @@ const ProjectsPage = () => {
   }, []);
 
   useEffect(() => {
-    const fetchProjects = async () => {
+    const fetchFeed = async () => {
       try {
         setLoading(true);
-        const res = await api.get("/projects", {
-          params: activeTag ? { tag: activeTag } : {},
+        const res = await api.get("/feed", {
+          params: {
+            type: typeFilter,
+            tag: activeTag || undefined,
+            q: search || undefined,
+          },
         });
-        setProjects(res.data);
+        setFeed(Array.isArray(res.data) ? res.data : []);
       } catch (err) {
         console.error("Fetch failed", err);
+        setFeed([]);
       } finally {
         setLoading(false);
       }
     };
-    fetchProjects();
-  }, [activeTag]);
+    fetchFeed();
+  }, [activeTag, typeFilter, search]);
 
   const handleTagClick = value => {
-  setSearchParams(prev => {
-    prev.set("tag", value);
-    return prev;
-  });
-};
+    setSearchParams(prev => {
+      prev.set("tag", value);
+      return prev;
+    });
+  };
 
-const clearFilter = () => {
-  setSearchParams(prev => {
-    prev.delete("tag");
-    return prev;
-  });
-};
+  const clearFilter = () => {
+    setSearchParams(prev => {
+      prev.delete("tag");
+      return prev;
+    });
+  };
 
   // 1. UPDATED INTRO UI
   if (isFirstHit && !introFinished) {
@@ -145,8 +145,37 @@ const clearFilter = () => {
       </div>
 
       {/* FILTER DRAWER */}
-      <div className={`overflow-hidden transition-all duration-500 ease-in-out ${showFilters ? "max-h-40 opacity-100 mb-8" : "max-h-0 opacity-0"}`}>
-        <div className="bg-[#0F111A] border border-white/10 p-5 rounded-[2rem] shadow-2xl">
+      <div className={`overflow-hidden transition-all duration-500 ease-in-out ${showFilters ? "max-h-72 opacity-100 mb-8" : "max-h-0 opacity-0"}`}>
+        <div className="bg-[#0F111A] border border-white/10 p-5 rounded-[2rem] shadow-2xl space-y-6">
+          {/* Type Filter Buttons */}
+          <div className="flex gap-3 justify-center">
+            {["all", "project", "blog"].map(type => (
+              <button
+                key={type}
+                onClick={() => setTypeFilter(type)}
+                className={`px-5 py-2 rounded-xl text-xs font-black uppercase tracking-widest border transition-all ${
+                  typeFilter === type
+                    ? "bg-indigo-600 border-indigo-500 text-white"
+                    : "bg-black/40 text-slate-500 border-white/5 hover:text-white"
+                }`}
+              >
+                {type === "all" ? "All" : type === "project" ? "Projects" : "Blogs"}
+              </button>
+            ))}
+          </div>
+
+          {/* Search Input */}
+          <div className="flex justify-center">
+            <input
+              type="text"
+              placeholder="Search the Grid..."
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              className="w-full max-w-md px-4 py-2 rounded-xl bg-black/40 border border-white/10 text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-600"
+            />
+          </div>
+
+          {/* Tag Buttons */}
           <div className="flex gap-3 items-center overflow-x-auto pb-2 scrollbar-hide">
             <button
               onClick={clearFilter}
@@ -157,7 +186,7 @@ const clearFilter = () => {
             >
               All Sectors
             </button>
-            {TAGS.map(({ label, value }) => {
+            {TAGS.map(value => {
               const active = activeTag === value;
               return (
                 <button
@@ -166,7 +195,7 @@ const clearFilter = () => {
                   className={`flex-shrink-0 px-5 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all
                     ${active ? "bg-indigo-600 border-indigo-500 text-white" : "bg-black/40 text-slate-500 border-white/5 hover:text-white"}`}
                 >
-                  #{label}
+                  #{value}
                 </button>
               );
             })}
@@ -181,7 +210,7 @@ const clearFilter = () => {
              <Loader2 className="w-10 h-10 text-indigo-500 animate-spin" />
              <span className="text-[10px] font-black text-slate-600 uppercase tracking-widest">Scanning Grid...</span>
           </div>
-        ) : projects.length === 0 ? (
+        ) : feed.length === 0 ? (
           <div className="text-center py-24 bg-[#0F111A] border border-white/5 rounded-[3rem]">
             <Layers className="mx-auto w-12 h-12 text-slate-700 mb-4" />
             <h3 className="text-xl font-black text-white uppercase tracking-tighter">No Signal Detected</h3>
@@ -189,9 +218,10 @@ const clearFilter = () => {
           </div>
         ) : (
           <div className="space-y-8">
-            {projects.map((p, idx) => (
-              <div key={p._id} className="animate-in fade-in slide-in-from-bottom-6 duration-700" style={{ animationDelay: `${idx * 100}ms` }}>
-                <ProjectCard project={p} />
+            {feed.map((item, idx) => (
+              <div key={item._id} className="animate-in fade-in slide-in-from-bottom-6 duration-700" style={{ animationDelay: `${idx * 100}ms` }}>
+                {item.feedType === "project" && <ProjectCard project={item} />}
+                {item.feedType === "blog" && <BlogCard blog={item} />}
               </div>
             ))}
           </div>
