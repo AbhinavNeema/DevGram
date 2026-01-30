@@ -3,7 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import api from "../api/axios";
 import ProjectCard from "../components/ProjectCard";
 import BlogCard from "../components/BlogCard";
-import TAGS from "../constants/TAGS";
+import TAGS from "../constants/tags";
 import { Filter, Layers, Zap, Terminal, Loader2, Activity } from "lucide-react";
 
 const ProjectsPage = () => {
