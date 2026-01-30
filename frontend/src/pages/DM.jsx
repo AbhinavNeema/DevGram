@@ -322,8 +322,18 @@ const DM = () => {
                       }`}>
                         {msg.type === "image" ? (
                           <div className="relative group/img">
-                             <img src={msg.content.startsWith("http") ? msg.content : `http://localhost:5001${msg.content}`} alt="sent" className="max-w-full rounded-xl border border-white/10" />
-                             <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/img:opacity-100 transition-opacity rounded-xl flex items-center justify-center"><ImageIcon className="text-white" /></div>
+                            <img
+                              src={
+                                msg.content.startsWith("http")
+                                  ? msg.content
+                                  : `${import.meta.env.VITE_BACKEND_URL}${msg.content}`
+                              }
+                              alt="sent"
+                              className="max-w-full rounded-xl border border-white/10"
+                            />
+                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/img:opacity-100 transition-opacity rounded-xl flex items-center justify-center">
+                              <ImageIcon className="text-white" />
+                            </div>
                           </div>
                         ) : (
                           editingMessageId === msg._id ? (
