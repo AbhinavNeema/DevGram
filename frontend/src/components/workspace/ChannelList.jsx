@@ -115,7 +115,7 @@ const ChannelList = ({ workspaceId, activeChannel, onSelect }) => {
         </div>
       </div>
 
-      <style jsx>{`
+      <style>{`
         .custom-scrollbar::-webkit-scrollbar {
           width: 5px;
         }
