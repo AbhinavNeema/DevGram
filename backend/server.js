@@ -24,6 +24,7 @@ app.use("/search",require("./routes/searchRoutes"))
 app.use("/workspaces", require("./routes/workspace"));
 app.use("/channels", require("./routes/Channel"));
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
+app.use("/feed", require("./routes/feed"));
 const server = http.createServer(app);
 const io = initSocket(server);
 
