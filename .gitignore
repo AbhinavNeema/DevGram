@@ -1,7 +1,13 @@
-node_modules/
-.env
-dist/
-build/
+# Python virtual envs
+venv/
+embedding-service/venv/
+
+# Python cache
+__pycache__/
+*.pyc
+
+# HuggingFace cache
+.cache/
+
+# MacOS
 .DS_Store
-npm-debug.log*
-.vscode
