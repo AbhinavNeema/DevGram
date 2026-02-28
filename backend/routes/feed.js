@@ -1,6 +1,7 @@
 const router = require("express").Router();
-const ctrl = require("../controllers/feedController");
+const auth = require("../middleware/auth");
+const feedController = require("../controllers/feedController");
 
-router.get("/", ctrl.getFeed);
+router.get("/", auth, feedController.getFeed);
 
 module.exports = router;

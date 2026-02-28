@@ -2,7 +2,9 @@ const Project = require("../models/Project");
 const cloudinary = require("../config/cloudinary");
 const ALLOWED_TAGS = require("../constants/tags");
 const User = require("../models/User");
-
+const Interaction = require("../models/Interaction");
+const { generateEmbedding } = require("../utils/embedding");
+const { updateUserEmbedding } = require("../utils/vector");
 exports.createProject = async (req, res) => {
   try {
     const { title, description, githubLink, liveDemoLink, mentions = "[]" } = req.body;
@@ -20,7 +22,16 @@ exports.createProject = async (req, res) => {
         });
       }
     }
-    
+
+    // 🔥 Generate semantic embedding
+    const textForEmbedding = `
+${title}
+${description}
+${techStack.join(" ")}
+    `;
+
+    const embedding = await generateEmbedding(textForEmbedding);
+
     const project = await Project.create({
       title,
       description,
@@ -30,6 +41,7 @@ exports.createProject = async (req, res) => {
       images,
       owner: req.userId,
       mentions: parsedMentions,
+      embedding,
     });
 
     res.status(201).json(project);
@@ -91,6 +103,40 @@ exports.likeProject = async (req, res) => {
       );
     }
 
+    // Handle interaction safely (no duplicates)
+    if (!hasLiked) {
+      // Add like interaction (upsert to prevent duplicates)
+      await Interaction.updateOne(
+        {
+          user: userId,
+          contentId: projectId,
+          contentType: "Project",
+          action: "like",
+        },
+        { $setOnInsert: { createdAt: new Date() } },
+        { upsert: true }
+      );
+
+      const user = await User.findById(userId);
+      if (user) {
+        const updatedEmbedding = updateUserEmbedding(
+          user.embedding,
+          project.embedding,
+          2 // like weight
+        );
+        user.embedding = updatedEmbedding;
+        await user.save();
+      }
+    } else {
+      // Remove like interaction on unlike
+      await Interaction.deleteOne({
+        user: userId,
+        contentId: projectId,
+        contentType: "Project",
+        action: "like",
+      });
+    }
+
     res.json({
       liked: !hasLiked,
       likesCount: updatedProject.likes.length,
@@ -106,6 +152,9 @@ exports.addComment = async (req, res) => {
     const { text, mentions = [] } = req.body;
 
     const project = await Project.findById(req.params.id);
+    console.log("📝 Add Comment Hit");
+    console.log("Project ID:", req.params.id);
+    console.log("User ID:", req.userId);
     if (!project) return res.status(404).json({ message: "Project not found" });
 
     project.comments.push({
@@ -115,6 +164,32 @@ exports.addComment = async (req, res) => {
     });
 
     await project.save();
+    console.log("✅ Comment pushed successfully. Total comments:", project.comments.length);
+
+    // Track comment interaction and update interest
+    console.log("🔁 Updating interaction for comment...");
+    await Interaction.updateOne(
+      {
+        user: req.userId,
+        contentId: project._id,
+        contentType: "Project",
+        action: "comment",
+      },
+      { $setOnInsert: { createdAt: new Date() } },
+      { upsert: true }
+    );
+
+    const user = await User.findById(req.userId);
+    if (user) {
+      const updatedEmbedding = updateUserEmbedding(
+        user.embedding,
+        project.embedding,
+        3 // comment weight
+      );
+      user.embedding = updatedEmbedding;
+      await user.save();
+      console.log("💾 User embedding updated successfully");
+    }
 
     const updated = await Project.findById(project._id)
       .populate("comments.author", "name username")
@@ -122,7 +197,7 @@ exports.addComment = async (req, res) => {
 
     res.json(updated.comments.at(-1));
   } catch (err) {
-    console.error(err);
+    console.error("❌ Add Comment Error:", err);
     res.status(500).json({ message: "Server error" });
   }
 };
@@ -221,6 +296,30 @@ exports.addView = async (req, res) => {
     project.viewedBy.push(userId);
 
     await project.save();
+
+    // Track view interaction and update interest
+    await Interaction.updateOne(
+      {
+        user: userId,
+        contentId: project._id,
+        contentType: "Project",
+        action: "view",
+      },
+      { $setOnInsert: { createdAt: new Date() } },
+      { upsert: true }
+    );
+
+    const user = await User.findById(userId);
+    if (user) {
+      const updatedEmbedding = updateUserEmbedding(
+        user.embedding,
+        project.embedding,
+        0.5 // view weight
+      );
+      user.embedding = updatedEmbedding;
+      await user.save();
+    }
+
     res.json({ views: project.views });
   } catch (err) {
     console.error("Add View Error:", err);

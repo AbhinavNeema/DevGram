@@ -67,7 +67,7 @@ const ProjectCard = ({ project, showOwnerActions = false }) => {
       text,
       mentions: commentMentions.map(u => u._id)
     });
-    setComments([...comments, res.data]);
+    setComments(prev => [...prev, res.data]);
     setText("");
     setCommentMentions([]);
   };
@@ -232,9 +232,47 @@ const ProjectCard = ({ project, showOwnerActions = false }) => {
 
       {/* COMMENTS SECTION */}
       <div className="bg-black/20 border-t border-white/5 p-6">
-        {/* Comment list truncated for brevity - same as before */}
+        {/* COMMENTS LIST */}
         <div className="space-y-4 mb-6">
-           {/* ... (Comments rendering logic) */}
+          {(showAllComments ? comments : comments.slice(0, 3)).map((comment) => (
+            <div
+              key={comment._id}
+              className="bg-[#1A1D26] border border-white/10 rounded-2xl p-4"
+            >
+              <div className="flex justify-between items-start">
+                <div>
+                  <p className="text-sm font-bold text-white">
+                    {comment.author?.name}
+                  </p>
+                  <p className="text-xs text-slate-500">
+                    {timeAgo(comment.createdAt)}
+                  </p>
+                </div>
+
+                {comment.author?._id === userId && (
+                  <button
+                    onClick={() => deleteComment(comment._id)}
+                    className="text-xs text-rose-500 hover:underline"
+                  >
+                    Delete
+                  </button>
+                )}
+              </div>
+
+              <div className="mt-2 text-sm text-slate-300">
+                {renderMentions(comment.text, comment.mentions)}
+              </div>
+            </div>
+          ))}
+
+          {comments.length > 3 && (
+            <button
+              onClick={() => setShowAllComments(!showAllComments)}
+              className="text-xs text-indigo-400 font-bold"
+            >
+              {showAllComments ? "Show Less" : "View All Comments"}
+            </button>
+          )}
         </div>
 
         {/* INPUT */}

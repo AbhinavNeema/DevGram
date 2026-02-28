@@ -1,6 +1,10 @@
 const Blog = require("../models/Blog");
 const cloudinary = require("../config/cloudinary");
 const ALLOWED_TAGS = require("../constants/tags");
+const Interaction = require("../models/Interaction");
+const User = require("../models/User");
+const { generateEmbedding } = require("../utils/embedding");
+const { updateUserEmbedding } = require("../utils/vector");
 
 exports.createBlog = async (req, res) => {
   try {
@@ -33,13 +37,23 @@ exports.createBlog = async (req, res) => {
       }
     }
 
+    // 🔥 Generate semantic embedding
+    const textForEmbedding = `
+${title}
+${content}
+${parsedTechStack.join(" ")}
+    `;
+
+    const embedding = await generateEmbedding(textForEmbedding);
+
     const blog = await Blog.create({
       title,
       content,
       techStack: parsedTechStack,
       mentions: parsedMentions,
       images,
-      author: req.userId
+      author: req.userId,
+      embedding,
     });
 
     res.status(201).json(blog);
@@ -81,6 +95,29 @@ exports.addView = async (req, res) => {
       date: today
     });
     await blog.save();
+
+    // Track view interaction safely (no duplicates)
+    await Interaction.updateOne(
+      {
+        user: req.userId,
+        contentId: blog._id,
+        contentType: "Blog",
+        action: "view",
+      },
+      { $setOnInsert: { createdAt: new Date() } },
+      { upsert: true }
+    );
+
+    const user = await User.findById(req.userId);
+    if (user) {
+      const updatedEmbedding = updateUserEmbedding(
+        user.embedding,
+        blog.embedding,
+        0.5 // view weight
+      );
+      user.embedding = updatedEmbedding;
+      await user.save();
+    }
   }
 
   res.json({ views: blog.views });
@@ -129,6 +166,39 @@ exports.likeBlog = async (req, res) => {
 
   await blog.save();
 
+  // Handle interaction safely (no duplicates)
+  if (!hasLiked) {
+    await Interaction.updateOne(
+      {
+        user: req.userId,
+        contentId: blog._id,
+        contentType: "Blog",
+        action: "like",
+      },
+      { $setOnInsert: { createdAt: new Date() } },
+      { upsert: true }
+    );
+
+    const user = await User.findById(req.userId);
+    if (user) {
+      const updatedEmbedding = updateUserEmbedding(
+        user.embedding,
+        blog.embedding,
+        2 // like weight
+      );
+      user.embedding = updatedEmbedding;
+      await user.save();
+    }
+  } else {
+    // Remove like interaction on unlike
+    await Interaction.deleteOne({
+      user: req.userId,
+      contentId: blog._id,
+      contentType: "Blog",
+      action: "like",
+    });
+  }
+
   res.json({
     liked: !hasLiked,
     likesCount: blog.likes.length,
@@ -149,6 +219,29 @@ exports.addComment = async (req, res) => {
   });
 
   await blog.save();
+
+  // Track comment interaction safely (no duplicates)
+  await Interaction.updateOne(
+    {
+      user: req.userId,
+      contentId: blog._id,
+      contentType: "Blog",
+      action: "comment",
+    },
+    { $setOnInsert: { createdAt: new Date() } },
+    { upsert: true }
+  );
+
+  const user = await User.findById(req.userId);
+  if (user) {
+    const updatedEmbedding = updateUserEmbedding(
+      user.embedding,
+      blog.embedding,
+      3 // comment weight
+    );
+    user.embedding = updatedEmbedding;
+    await user.save();
+  }
 
   const populated = await Blog.findById(blog._id)
     .populate("comments.author", "name username")

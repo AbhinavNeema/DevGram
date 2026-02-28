@@ -1,74 +1,93 @@
 const Project = require("../models/Project");
 const Blog = require("../models/Blog");
+const User = require("../models/User");
+const { cosineSimilarity } = require("../utils/vector");
 
 exports.getFeed = async (req, res) => {
   try {
-    const { type = "all", tag, q } = req.query;
+    const user = await User.findById(req.userId).lean();
+    if (!user) return res.status(404).json({ message: "User not found" });
 
-    const projectQuery = {};
-    const blogQuery = {};
+    const userEmbedding = user.embedding || [];
+    const followingIds = (user.following || []).map(id => id.toString());
 
-    /* ---------------- TAG FILTER ---------------- */
-    if (tag) {
-      projectQuery.techStack = tag;
-      blogQuery.techStack = tag; // ✅ FIXED
+    // 🔥 Retrieve all projects & blogs (can later limit to recent 300-500)
+    const projects = await Project.find({})
+      .select("title description techStack owner createdAt likes views comments embedding")
+      .populate("owner", "name username")
+      .populate("comments.author", "name username")
+      .populate("comments.mentions", "username")
+      .lean();
+
+    const blogs = await Blog.find({})
+      .select("title content techStack author createdAt likes views comments embedding")
+      .populate("author", "name username")
+      .populate("comments.author", "name username")
+      .populate("comments.mentions", "username")
+      .lean();
+
+    const scoreItem = (item) => {
+      const similarity = cosineSimilarity(userEmbedding, item.embedding);
+
+      // Recency boost (exponential decay)
+      const ageHours =
+        (Date.now() - new Date(item.createdAt)) / (1000 * 60 * 60);
+      const recencyBoost = Math.exp(-ageHours / 48);
+
+      // Follow boost (stronger priority)
+      const ownerId = item.owner?._id?.toString() || item.author?._id?.toString();
+      const followBoost = followingIds.includes(ownerId) ? 0.4 : 0;
+
+      return 0.6 * similarity + 0.3 * recencyBoost + followBoost;
+    };
+
+    let feed = [
+      ...projects.map(p => ({
+        ...p,
+        feedType: "project",
+        score: scoreItem(p),
+      })),
+      ...blogs.map(b => ({
+        ...b,
+        feedType: "blog",
+        score: scoreItem(b),
+      })),
+    ];
+
+    // 🔥 Add trending score fallback for cold users
+    if (!userEmbedding || userEmbedding.length === 0) {
+      feed.forEach(item => {
+        const trendingScore =
+          (item.likes?.length || 0) + (item.views || 0);
+        item.score = trendingScore;
+      });
     }
 
-    /* ---------------- SEARCH FILTER ---------------- */
-    if (q) {
-      const regex = new RegExp(q, "i");
+    // 🔥 Sort by final score
+    feed.sort((a, b) => b.score - a.score);
 
-      projectQuery.$or = [
-        { title: regex },
-        { description: regex },
-      ];
+    // 🔥 Ensure posts from following always appear (even if low similarity)
+    const followingPosts = feed.filter(item => {
+      const ownerId = item.owner?._id?.toString() || item.author?._id?.toString();
+      return followingIds.includes(ownerId);
+    });
 
-      blogQuery.$or = [
-        { title: regex },
-        { content: regex },
-      ];
-    }
+    const nonFollowingPosts = feed.filter(item => {
+      const ownerId = item.owner?._id?.toString() || item.author?._id?.toString();
+      return !followingIds.includes(ownerId);
+    });
 
-    let feed = [];
+    const finalFeed = [...followingPosts, ...nonFollowingPosts];
 
-    /* ---------------- PROJECTS ---------------- */
-    if (type === "project" || type === "all") {
-      const projects = await Project.find(projectQuery)
-        .populate("owner", "name username")
-        .sort({ createdAt: -1 })
-        .lean();
+    // Return top 20
+    res.json({
+      cursor: 20,
+      hasMore: false,
+      data: finalFeed.slice(0, 20),
+    });
 
-      feed.push(
-        ...projects.map(p => ({
-          ...p,
-          feedType: "project",
-        }))
-      );
-    }
-
-    /* ---------------- BLOGS ---------------- */
-    if (type === "blog" || type === "all") {
-      const blogs = await Blog.find(blogQuery)
-        .populate("author", "name username")
-        .sort({ createdAt: -1 })
-        .lean();
-
-      feed.push(
-        ...blogs.map(b => ({
-          ...b,
-          feedType: "blog",
-        }))
-      );
-    }
-
-    /* ---------------- FINAL SORT ---------------- */
-    feed.sort(
-      (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
-    );
-
-    res.json(feed);
   } catch (err) {
-    console.error("Feed error:", err);
-    res.status(500).json({ message: "Failed to load feed" });
+    console.error("Vector Feed Error:", err);
+    res.status(500).json({ message: "Server error" });
   }
 };

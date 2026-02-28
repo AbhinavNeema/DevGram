@@ -74,6 +74,10 @@ const projectSchema = new mongoose.Schema(
         ref: "User",
       },
     ],
+    embedding: {
+      type: [Number],
+      default: []
+    },
   },
   { timestamps: true }
 );

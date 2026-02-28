@@ -24,6 +24,15 @@ const userSchema = new mongoose.Schema(
       type: [String],
       default: []
     },
+    interestVector: {
+      type: Map,
+      of: Number,
+      default: {}
+    },
+    embedding: {
+      type: [Number],
+      default: []
+    },
   },
   { timestamps: true }
 );

@@ -41,14 +41,21 @@ const ProjectsPage = () => {
     const fetchFeed = async () => {
       try {
         setLoading(true);
+
         const res = await api.get("/feed", {
           params: {
-            type: typeFilter,
-            tag: activeTag || undefined,
-            q: search || undefined,
+            cursor: 0,
+            limit: 20,
           },
         });
-        setFeed(Array.isArray(res.data) ? res.data : []);
+
+        // Backend now returns: { cursor, hasMore, data }
+        if (res.data && Array.isArray(res.data.data)) {
+          setFeed(res.data.data);
+        } else {
+          setFeed([]);
+        }
+
       } catch (err) {
         console.error("Fetch failed", err);
         setFeed([]);

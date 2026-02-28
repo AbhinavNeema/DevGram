@@ -35,6 +35,10 @@ const blogSchema = new mongoose.Schema(
     ],
     likes: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
     comments: [commentSchema],
+    embedding: {
+      type: [Number],
+      default: []
+    },
   },
   { timestamps: true }
 );
