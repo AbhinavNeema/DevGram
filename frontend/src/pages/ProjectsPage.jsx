@@ -3,17 +3,13 @@ import { useSearchParams } from "react-router-dom";
 import api from "../api/axios";
 import ProjectCard from "../components/ProjectCard";
 import BlogCard from "../components/BlogCard";
-import TAGS from "../constants/tags";
-import { Filter, Layers, Zap, Terminal, Loader2, Activity } from "lucide-react";
+import { Layers, Zap, Terminal, Loader2, Activity } from "lucide-react";
 
 const ProjectsPage = () => {
   const [feed, setFeed] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [showFilters, setShowFilters] = useState(false);
   const [searchParams, setSearchParams] = useSearchParams();
   const activeTag = searchParams.get("tag");
-  const [typeFilter, setTypeFilter] = useState("all");
-  const [search, setSearch] = useState("");
 
   // Animation States
   const [isFirstHit, setIsFirstHit] = useState(false);
@@ -49,8 +45,10 @@ const ProjectsPage = () => {
           },
         });
 
-        // Backend now returns: { cursor, hasMore, data }
-        if (res.data && Array.isArray(res.data.data)) {
+        // Support both old and new backend formats
+        if (Array.isArray(res.data)) {
+          setFeed(res.data);
+        } else if (res.data && Array.isArray(res.data.data)) {
           setFeed(res.data.data);
         } else {
           setFeed([]);
@@ -64,7 +62,7 @@ const ProjectsPage = () => {
       }
     };
     fetchFeed();
-  }, [activeTag, typeFilter, search]);
+  }, []);
 
   const handleTagClick = value => {
     setSearchParams(prev => {
@@ -134,79 +132,6 @@ const ProjectsPage = () => {
             <Zap className="w-3.5 h-3.5 text-indigo-500" />
             {activeTag ? `Filtering Sector: #${activeTag}` : "Global Community Stream"}
           </p>
-        </div>
-
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => setShowFilters(prev => !prev)}
-            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all border ${
-              showFilters 
-              ? "bg-indigo-600 border-indigo-500 text-white shadow-lg" 
-              : "bg-[#0F111A] border-white/10 text-slate-400 hover:text-white"
-            }`}
-          >
-            <Filter className="w-4 h-4" />
-            {showFilters ? "Close Interface" : "Filter Nodes"}
-          </button>
-        </div>
-      </div>
-
-      {/* FILTER DRAWER */}
-      <div className={`overflow-hidden transition-all duration-500 ease-in-out ${showFilters ? "max-h-72 opacity-100 mb-8" : "max-h-0 opacity-0"}`}>
-        <div className="bg-[#0F111A] border border-white/10 p-5 rounded-[2rem] shadow-2xl space-y-6">
-          {/* Type Filter Buttons */}
-          <div className="flex gap-3 justify-center">
-            {["all", "project", "blog"].map(type => (
-              <button
-                key={type}
-                onClick={() => setTypeFilter(type)}
-                className={`px-5 py-2 rounded-xl text-xs font-black uppercase tracking-widest border transition-all ${
-                  typeFilter === type
-                    ? "bg-indigo-600 border-indigo-500 text-white"
-                    : "bg-black/40 text-slate-500 border-white/5 hover:text-white"
-                }`}
-              >
-                {type === "all" ? "All" : type === "project" ? "Projects" : "Blogs"}
-              </button>
-            ))}
-          </div>
-
-          {/* Search Input */}
-          <div className="flex justify-center">
-            <input
-              type="text"
-              placeholder="Search the Grid..."
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              className="w-full max-w-md px-4 py-2 rounded-xl bg-black/40 border border-white/10 text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-600"
-            />
-          </div>
-
-          {/* Tag Buttons */}
-          <div className="flex gap-3 items-center overflow-x-auto pb-2 scrollbar-hide">
-            <button
-              onClick={clearFilter}
-              className={`flex-shrink-0 px-5 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all
-                ${!activeTag
-                  ? "bg-indigo-600 border-indigo-500 text-white"
-                  : "bg-black/40 text-slate-500 border-white/5 hover:border-white/20 hover:text-white"}`}
-            >
-              All Sectors
-            </button>
-            {TAGS.map(value => {
-              const active = activeTag === value;
-              return (
-                <button
-                  key={value}
-                  onClick={() => handleTagClick(value)}
-                  className={`flex-shrink-0 px-5 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all
-                    ${active ? "bg-indigo-600 border-indigo-500 text-white" : "bg-black/40 text-slate-500 border-white/5 hover:text-white"}`}
-                >
-                  #{value}
-                </button>
-              );
-            })}
-          </div>
         </div>
       </div>
 
