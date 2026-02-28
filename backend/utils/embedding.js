@@ -1,6 +1,6 @@
 const axios = require("axios");
 
-const EMBEDDING_API = "http://127.0.0.1:8001/embed";
+const EMBEDDING_API = process.env.EMBEDDING_URL;
 
 exports.generateEmbedding = async (text) => {
   try {
