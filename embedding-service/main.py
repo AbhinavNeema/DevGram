@@ -6,7 +6,7 @@ import os
 app = FastAPI()
 
 print("🚀 Loading MiniLM model...")
-model = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")
+model = SentenceTransformer("sentence-transformers/paraphrase-MiniLM-L3-v2")
 print("✅ Model loaded.")
 
 class EmbedRequest(BaseModel):
