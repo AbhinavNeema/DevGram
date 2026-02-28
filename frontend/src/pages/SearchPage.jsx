@@ -11,12 +11,29 @@ const SearchPage = () => {
   const [users, setUsers] = useState([]);
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [debouncedQuery, setDebouncedQuery] = useState("");
+
+  useEffect(() => {
+    if (!q) {
+      setDebouncedQuery("");
+      setUsers([]);
+      setProjects([]);
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    const timeout = setTimeout(() => {
+      setDebouncedQuery(q);
+    }, 400);
+
+    return () => clearTimeout(timeout);
+  }, [q]);
 
   useEffect(() => {
     const runSearch = async () => {
       setLoading(true);
       try {
-        const res = await api.get(`/search?q=${q}`);
+        const res = await api.get(`/search?q=${debouncedQuery}`);
         setUsers(res.data.users);
         setProjects(res.data.projects);
       } catch (err) {
@@ -26,8 +43,8 @@ const SearchPage = () => {
       }
     };
 
-    if (q) runSearch();
-  }, [q]);
+    if (debouncedQuery) runSearch();
+  }, [debouncedQuery]);
 
   const highlight = (text = "", query = "") => {
     if (!query) return text;
@@ -159,7 +176,12 @@ const SearchPage = () => {
                       className="animate-in fade-in slide-in-from-bottom-4 fill-mode-both"
                       style={{ animationDelay: `${idx * 50}ms` }}
                     >
-                      <ProjectCard project={p} />
+                      <div className="relative">
+                        <div className="absolute top-3 right-3 text-[9px] uppercase font-black tracking-widest text-indigo-400 bg-indigo-500/10 px-2 py-1 rounded-full">
+                          Semantic Match
+                        </div>
+                        <ProjectCard project={p} />
+                      </div>
                     </div>
                   ))}
                 </div>

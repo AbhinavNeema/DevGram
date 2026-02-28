@@ -9,17 +9,35 @@ exports.getFeed = async (req, res) => {
     if (!user) return res.status(404).json({ message: "User not found" });
 
     const userEmbedding = user.embedding || [];
+    const start = Number(req.query.cursor || 0);
+    const limit = Number(req.query.limit || 20);
     const followingIds = (user.following || []).map(id => id.toString());
 
+    const { tag } = req.query;
+
+    let projectFilter = {};
+    let blogFilter = {};
+
+    if (tag) {
+      projectFilter.techStack = tag;
+      blogFilter.techStack = tag;
+    }
+
     // 🔥 Retrieve all projects & blogs (can later limit to recent 300-500)
-    const projects = await Project.find({})
+    const RECENT_LIMIT = 500;
+
+    const projects = await Project.find(projectFilter)
+      .sort({ createdAt: -1 })
+      .limit(RECENT_LIMIT)
       .select("title description techStack owner createdAt likes views comments embedding")
       .populate("owner", "name username")
       .populate("comments.author", "name username")
       .populate("comments.mentions", "username")
       .lean();
 
-    const blogs = await Blog.find({})
+    const blogs = await Blog.find(blogFilter)
+      .sort({ createdAt: -1 })
+      .limit(RECENT_LIMIT)
       .select("title content techStack author createdAt likes views comments embedding")
       .populate("author", "name username")
       .populate("comments.author", "name username")
@@ -79,11 +97,12 @@ exports.getFeed = async (req, res) => {
 
     const finalFeed = [...followingPosts, ...nonFollowingPosts];
 
-    // Return top 20
+    const paginatedFeed = finalFeed.slice(start, start + limit);
+
     res.json({
-      cursor: 20,
-      hasMore: false,
-      data: finalFeed.slice(0, 20),
+      cursor: start + limit,
+      hasMore: start + limit < finalFeed.length,
+      data: paginatedFeed,
     });
 
   } catch (err) {

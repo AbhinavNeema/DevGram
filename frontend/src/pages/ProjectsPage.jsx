@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
 import api from "../api/axios";
 import ProjectCard from "../components/ProjectCard";
@@ -8,6 +8,9 @@ import { Layers, Zap, Terminal, Loader2, Activity } from "lucide-react";
 const ProjectsPage = () => {
   const [feed, setFeed] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [cursor, setCursor] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [searchParams, setSearchParams] = useSearchParams();
   const activeTag = searchParams.get("tag");
 
@@ -33,36 +36,64 @@ const ProjectsPage = () => {
     }
   }, []);
 
-  useEffect(() => {
-    const fetchFeed = async () => {
-      try {
+  const fetchFeed = async (isInitial = false) => {
+    try {
+      if (isInitial) {
         setLoading(true);
-
-        const res = await api.get("/feed", {
-          params: {
-            cursor: 0,
-            limit: 20,
-          },
-        });
-
-        // Support both old and new backend formats
-        if (Array.isArray(res.data)) {
-          setFeed(res.data);
-        } else if (res.data && Array.isArray(res.data.data)) {
-          setFeed(res.data.data);
-        } else {
-          setFeed([]);
-        }
-
-      } catch (err) {
-        console.error("Fetch failed", err);
-        setFeed([]);
-      } finally {
-        setLoading(false);
+      } else {
+        if (!hasMore) return;
+        setLoadingMore(true);
       }
-    };
-    fetchFeed();
-  }, []);
+
+      const res = await api.get("/feed", {
+        params: {
+          cursor: isInitial ? 0 : cursor,
+          limit: 20,
+          tag: activeTag || undefined,
+        },
+      });
+
+      const payload = Array.isArray(res.data)
+        ? { data: res.data, hasMore: false, cursor: 20 }
+        : res.data;
+
+      setFeed(prev =>
+        isInitial ? payload.data : [...prev, ...payload.data]
+      );
+
+      setCursor(payload.cursor || 0);
+      setHasMore(payload.hasMore ?? false);
+
+    } catch (err) {
+      console.error("Fetch failed", err);
+      if (isInitial) setFeed([]);
+    } finally {
+      setLoading(false);
+      setLoadingMore(false);
+    }
+  };
+
+  useEffect(() => {
+    setFeed([]);
+    setCursor(0);
+    setHasMore(true);
+    fetchFeed(true);
+  }, [activeTag]);
+
+  const observer = useRef();
+
+  const lastItemRef = useCallback(node => {
+    if (loadingMore) return;
+    if (observer.current) observer.current.disconnect();
+
+    observer.current = new IntersectionObserver(entries => {
+      if (entries[0].isIntersecting && hasMore) {
+        fetchFeed(false);
+      }
+    });
+
+    if (node) observer.current.observe(node);
+  }, [loadingMore, hasMore, cursor]);
 
   const handleTagClick = value => {
     setSearchParams(prev => {
@@ -150,12 +181,26 @@ const ProjectsPage = () => {
           </div>
         ) : (
           <div className="space-y-8">
-            {feed.map((item, idx) => (
-              <div key={item._id} className="animate-in fade-in slide-in-from-bottom-6 duration-700" style={{ animationDelay: `${idx * 100}ms` }}>
-                {item.feedType === "project" && <ProjectCard project={item} />}
-                {item.feedType === "blog" && <BlogCard blog={item} />}
+            {feed.map((item, idx) => {
+              const isLast = idx === feed.length - 1;
+
+              return (
+                <div
+                  key={item._id}
+                  ref={isLast ? lastItemRef : null}
+                  className="animate-in fade-in slide-in-from-bottom-6 duration-700"
+                  style={{ animationDelay: `${idx * 100}ms` }}
+                >
+                  {item.feedType === "project" && <ProjectCard project={item} />}
+                  {item.feedType === "blog" && <BlogCard blog={item} />}
+                </div>
+              );
+            })}
+            {loadingMore && (
+              <div className="flex justify-center py-8">
+                <Loader2 className="w-6 h-6 animate-spin text-indigo-500" />
               </div>
-            ))}
+            )}
           </div>
         )}
       </div>
