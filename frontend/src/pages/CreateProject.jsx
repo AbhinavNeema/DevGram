@@ -3,21 +3,21 @@ import api from "../api/axios";
 import { useNavigate } from "react-router-dom";
 import TAGS from "../constants/tags";
 import MentionInput from "../components/MentionInput";
-import { 
-  Rocket, 
-  BookOpen, 
-  Code2, 
-  Image as ImageIcon, 
-  Github, 
-  ExternalLink, 
-  X, 
-  Plus, 
-  Loader2,
-  Cpu
+import {
+  Rocket,
+  BookOpen,
+  Code2,
+  Image as ImageIcon,
+  Github,
+  ExternalLink,
+  X,
+  Plus,
+  Loader2
 } from "lucide-react";
 
 const CreateProject = () => {
   const navigate = useNavigate();
+
   const [mode, setMode] = useState("project");
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
@@ -30,37 +30,41 @@ const CreateProject = () => {
   const [mentions, setMentions] = useState([]);
   const [loading, setLoading] = useState(false);
 
-  const addTag = tag => {
+  const addTag = (tag) => {
     if (techStack.includes(tag)) return;
     if (techStack.length >= 8) return;
     setTechStack([...techStack, tag]);
     setTagSearch("");
   };
 
-  const removeTag = tag => {
-    setTechStack(techStack.filter(t => t !== tag));
+  const removeTag = (tag) => {
+    setTechStack(techStack.filter((t) => t !== tag));
   };
 
   const filteredTags = TAGS.filter(
-    tag =>
+    (tag) =>
       tag.toLowerCase().includes(tagSearch.toLowerCase()) &&
       !techStack.includes(tag)
   );
 
-  const handleImages = e => {
+  const handleImages = (e) => {
     const files = Array.from(e.target.files);
     setImages(files);
-    setPreviews(files.map(f => URL.createObjectURL(f)));
+    setPreviews(files.map((f) => URL.createObjectURL(f)));
   };
 
   const submit = async () => {
     if (!title || !content) return;
+
     setLoading(true);
+
     try {
       const formData = new FormData();
+
       formData.append("title", title);
-      formData.append("mentions", JSON.stringify(mentions.map(m => m._id)));
+      formData.append("mentions", JSON.stringify(mentions.map((m) => m._id)));
       formData.append("techStack", JSON.stringify(techStack));
+
       if (mode === "project") {
         formData.append("description", content);
         if (github) formData.append("githubLink", github);
@@ -68,10 +72,13 @@ const CreateProject = () => {
       } else {
         formData.append("content", content);
       }
-      images.forEach(img => formData.append("images", img));
+
+      images.forEach((img) => formData.append("images", img));
+
       await api.post(mode === "project" ? "/projects" : "/blogs", formData, {
         headers: { "Content-Type": "multipart/form-data" }
       });
+
       navigate("/");
     } finally {
       setLoading(false);
@@ -79,123 +86,139 @@ const CreateProject = () => {
   };
 
   return (
-    <div className="max-w-2xl mx-auto bg-[#0F111A] border border-white/10 rounded-[32px] p-6 sm:p-10 shadow-2xl mb-12 animate-in fade-in zoom-in duration-500">
-      
-      {/* HEADER & TOGGLE */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6 mb-10">
+    <div className="max-w-2xl mx-auto bg-white border border-gray-100 rounded-3xl p-6 sm:p-8 shadow-lg">
+
+      {/* HEADER */}
+      <div className="flex items-center justify-between mb-8">
         <div>
-          <h2 className="text-3xl font-black text-white tracking-tighter">
-            {mode === "project" ? "Launch Project" : "Publish Insight"}
+          <h2 className="text-2xl font-bold text-slate-900">
+            {mode === "project" ? "Create Project" : "Write Blog"}
           </h2>
-          <p className="text-slate-500 text-xs font-bold uppercase tracking-widest mt-1">
-            {mode === "project" ? "Deploy your creation" : "Share your knowledge"}
+          <p className="text-sm text-slate-500">
+            {mode === "project"
+              ? "Share your latest build"
+              : "Share knowledge with the community"}
           </p>
         </div>
 
-        <div className="flex bg-black/40 p-1.5 rounded-2xl border border-white/5 w-full sm:w-fit">
+        <div className="flex bg-gray-100 rounded-xl p-1">
           <button
             onClick={() => setMode("project")}
-            className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${
-              mode === "project" ? "bg-indigo-600 text-white shadow-lg" : "text-slate-500 hover:text-slate-300"
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition ${
+              mode === "project"
+                ? "bg-indigo-600 text-white"
+                : "text-slate-600"
             }`}
           >
-            <Rocket className="w-4 h-4" /> Project
+            <Rocket className="w-4 h-4" />
+            Project
           </button>
+
           <button
             onClick={() => setMode("blog")}
-            className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${
-              mode === "blog" ? "bg-indigo-600 text-white shadow-lg" : "text-slate-500 hover:text-slate-300"
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition ${
+              mode === "blog"
+                ? "bg-indigo-600 text-white"
+                : "text-slate-600"
             }`}
           >
-            <BookOpen className="w-4 h-4" /> Blog
+            <BookOpen className="w-4 h-4" />
+            Blog
           </button>
         </div>
       </div>
 
-      <div className="space-y-8">
-        {/* TITLE INPUT */}
-        <div className="space-y-2 group">
-          <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] ml-1">Title</label>
+      <div className="space-y-6">
+
+        {/* TITLE */}
+        <div>
+          <label className="text-sm font-semibold text-slate-700 mb-1 block">
+            Title
+          </label>
           <input
             value={title}
-            onChange={e => setTitle(e.target.value)}
-            placeholder={mode === "project" ? "Enter project name..." : "Enter blog heading..."}
-            className="w-full bg-[#161925] border-2 border-white/5 rounded-2xl px-5 py-4 text-white font-bold placeholder:text-slate-700 focus:outline-none focus:border-indigo-500/50 transition-all shadow-inner"
+            onChange={(e) => setTitle(e.target.value)}
+            placeholder="Enter title..."
+            className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-100"
           />
         </div>
 
-        {/* CONTENT INPUT */}
-        <div className="space-y-2 group">
-          <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] ml-1">Content Brief</label>
-          <div className="rounded-2xl border-2 border-white/5 bg-[#161925] focus-within:border-indigo-500/50 transition-all overflow-hidden">
+        {/* CONTENT */}
+        <div>
+          <label className="text-sm font-semibold text-slate-700 mb-1 block">
+            Description
+          </label>
+
+          <div className="border border-gray-200 rounded-xl">
             <MentionInput
               value={content}
               onChange={setContent}
               onMentionsChange={setMentions}
-              placeholder={mode === "project" ? "Technical details, learnings, and goals..." : "Share your story or tutorial..."}
+              placeholder="Write something..."
               rows={mode === "project" ? 5 : 8}
-              className="w-full bg-transparent px-5 py-4 text-white font-medium placeholder:text-slate-700 outline-none"
             />
           </div>
         </div>
 
         {/* TECH STACK */}
-        <div className="space-y-4">
-          <div className="flex items-center justify-between px-1">
-            <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">Architecture <span className="text-indigo-500 opacity-60">({techStack.length}/8)</span></label>
-            <Cpu className="w-4 h-4 text-slate-700" />
-          </div>
+        <div>
+          <label className="text-sm font-semibold text-slate-700 mb-2 block">
+            Tech Stack
+          </label>
 
-          <div className="flex flex-wrap gap-2 min-h-[20px]">
-            {techStack.map(tag => (
-              <span key={tag} className="bg-indigo-600 text-white px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest flex items-center gap-2 animate-in zoom-in duration-300">
+          <div className="flex flex-wrap gap-2 mb-3">
+            {techStack.map((tag) => (
+              <span
+                key={tag}
+                className="flex items-center gap-2 bg-indigo-50 text-indigo-700 px-3 py-1 rounded-full text-xs font-semibold"
+              >
                 {tag}
-                <button onClick={() => removeTag(tag)} className="hover:text-red-300 transition-colors"><X className="w-3 h-3 stroke-[4px]" /></button>
+                <button onClick={() => removeTag(tag)}>
+                  <X className="w-3 h-3" />
+                </button>
               </span>
             ))}
           </div>
 
-          <div className="relative">
-            <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-600">
-              <Code2 className="w-4 h-4" />
+          <input
+            value={tagSearch}
+            onChange={(e) => setTagSearch(e.target.value)}
+            placeholder="Search technologies..."
+            className="w-full border border-gray-200 rounded-xl px-4 py-2 text-sm"
+          />
+
+          {tagSearch && (
+            <div className="border border-gray-100 rounded-xl mt-2 bg-white shadow">
+              {filteredTags.slice(0, 6).map((tag) => (
+                <div
+                  key={tag}
+                  onClick={() => addTag(tag)}
+                  className="px-4 py-2 hover:bg-indigo-50 cursor-pointer text-sm"
+                >
+                  {tag}
+                </div>
+              ))}
             </div>
-            <input
-              value={tagSearch}
-              onChange={e => setTagSearch(e.target.value)}
-              placeholder="Search technologies (e.g. React, Docker...)"
-              className="w-full bg-[#161925] border-2 border-white/5 rounded-2xl pl-12 pr-5 py-4 text-sm text-white font-bold placeholder:text-slate-700 focus:outline-none focus:border-indigo-500/50 transition-all"
-            />
-            {tagSearch && filteredTags.length > 0 && (
-              <div className="absolute z-50 bg-[#1A1D26] border border-white/10 rounded-2xl mt-2 w-full shadow-2xl max-h-48 overflow-y-auto p-2 backdrop-blur-xl">
-                {filteredTags.map(tag => (
-                  <div key={tag} onClick={() => addTag(tag)} className="px-4 py-3 text-sm text-slate-300 hover:bg-indigo-600 hover:text-white rounded-xl cursor-pointer transition-all font-bold">
-                    {tag}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+          )}
         </div>
 
-        {/* IMAGES */}
-        <div className="space-y-4">
-          <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] ml-1 flex items-center gap-2">
-            <ImageIcon className="w-4 h-4" /> Visual Assets
-          </label>
-          <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-white/10 rounded-[2rem] bg-black/20 hover:bg-black/40 hover:border-indigo-500/40 transition-all cursor-pointer group/upload">
-            <div className="flex flex-col items-center justify-center pt-5 pb-6">
-              <Plus className="w-8 h-8 text-slate-600 group-hover/upload:scale-110 group-hover/upload:text-indigo-500 transition-all duration-300" />
-              <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mt-2">Upload Media</p>
-            </div>
-            <input type="file" multiple accept="image/*" onChange={handleImages} className="hidden" />
+        {/* IMAGE UPLOAD */}
+        <div>
+          <label className="flex items-center gap-2 text-sm font-semibold text-slate-700 mb-2">
+            <ImageIcon className="w-4 h-4" />
+            Images
           </label>
 
+          <input type="file" multiple onChange={handleImages} />
+
           {previews.length > 0 && (
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-3 gap-3 mt-3">
               {previews.map((src, i) => (
-                <div key={i} className="relative aspect-video rounded-xl overflow-hidden border border-white/10 group/img">
-                  <img src={src} className="w-full h-full object-cover transition-transform group-hover/img:scale-110" alt="Preview" />
-                </div>
+                <img
+                  key={i}
+                  src={src}
+                  className="rounded-lg object-cover w-full h-24"
+                />
               ))}
             </div>
           )}
@@ -203,15 +226,20 @@ const CreateProject = () => {
 
         {/* PROJECT LINKS */}
         {mode === "project" && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="relative group">
-              <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-600"><Github className="w-4 h-4" /></div>
-              <input value={github} onChange={e => setGithub(e.target.value)} placeholder="Repository link" className="w-full bg-[#161925] border-2 border-white/5 rounded-2xl pl-12 pr-5 py-4 text-xs text-white font-bold focus:border-indigo-500/50 outline-none" />
-            </div>
-            <div className="relative group">
-              <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-600"><ExternalLink className="w-4 h-4" /></div>
-              <input value={demo} onChange={e => setDemo(e.target.value)} placeholder="Live demo link" className="w-full bg-[#161925] border-2 border-white/5 rounded-2xl pl-12 pr-5 py-4 text-xs text-white font-bold focus:border-indigo-500/50 outline-none" />
-            </div>
+          <div className="grid sm:grid-cols-2 gap-4">
+            <input
+              value={github}
+              onChange={(e) => setGithub(e.target.value)}
+              placeholder="GitHub link"
+              className="border border-gray-200 rounded-xl px-4 py-2 text-sm"
+            />
+
+            <input
+              value={demo}
+              onChange={(e) => setDemo(e.target.value)}
+              placeholder="Live demo link"
+              className="border border-gray-200 rounded-xl px-4 py-2 text-sm"
+            />
           </div>
         )}
 
@@ -219,17 +247,18 @@ const CreateProject = () => {
         <button
           onClick={submit}
           disabled={loading}
-          className="w-full relative overflow-hidden bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white py-5 rounded-2xl font-black text-sm uppercase tracking-[0.2em] shadow-[0_20px_40px_-10px_rgba(79,70,229,0.4)] transition-all active:scale-[0.98] mt-6 flex items-center justify-center gap-3"
+          className="w-full bg-indigo-600 hover:bg-indigo-500 text-white py-3 rounded-xl font-semibold flex items-center justify-center gap-2 transition"
         >
           {loading ? (
             <Loader2 className="w-5 h-5 animate-spin" />
           ) : (
             <>
-              {mode === "project" ? "Finalize Deployment" : "Publish to Feed"}
-              <Plus className="w-5 h-5 stroke-[3px]" />
+              {mode === "project" ? "Create Project" : "Publish Blog"}
+              <Plus className="w-4 h-4" />
             </>
           )}
         </button>
+
       </div>
     </div>
   );

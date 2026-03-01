@@ -32,142 +32,195 @@ const ChannelSettings = ({ channel, workspace, onClose }) => {
   };
 
   return (
-    <>
-      {/* HIGH-CONTRAST BACKDROP */}
-      <div
-        className="fixed inset-0 bg-black/80 backdrop-blur-md z-[60] transition-opacity duration-300"
-        onClick={onClose}
-      />
+  <>
+    {/* BACKDROP */}
+    <div
+      className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[60]"
+      onClick={onClose}
+    />
 
-      {/* SETTINGS PANEL: Midnight Deep Navy */}
-      <div className="fixed top-0 right-0 h-full w-full sm:w-[440px] bg-[#0A0B10] border-l border-white/10 z-[70] shadow-2xl flex flex-col animate-slide-in">
-        
-        {/* HEADER: Solid High-Visibility Header */}
-        <div className="px-6 py-6 border-b border-white/10 flex items-center justify-between bg-[#11141D]">
-          <div className="flex items-center gap-4">
-            <div className="p-2.5 bg-indigo-600 rounded-xl shadow-[0_0_20px_rgba(79,70,229,0.4)]">
-              <Settings className="w-5 h-5 text-white stroke-[2.5px]" />
-            </div>
-            <div>
-              <h3 className="font-black text-white text-lg tracking-tight leading-none">Channel Control</h3>
-              <p className="text-[10px] text-indigo-400 font-bold uppercase tracking-[0.2em] mt-1.5">Settings & Privacy</p>
-            </div>
+    {/* PANEL */}
+    <div className="fixed top-0 right-0 h-full w-full sm:w-[440px] bg-white border-l border-gray-200 z-[70] shadow-2xl flex flex-col">
+
+      {/* HEADER */}
+      <div className="px-6 py-5 border-b border-gray-200 flex items-center justify-between">
+
+        <div className="flex items-center gap-3">
+          <div className="p-2 bg-indigo-50 rounded-lg text-indigo-600">
+            <Settings className="w-5 h-5"/>
           </div>
-          <button
-            onClick={onClose}
-            className="p-2 rounded-lg bg-white/5 text-slate-400 hover:text-white hover:bg-white/10 transition-all border border-white/10"
-          >
-            <X className="w-5 h-5" />
-          </button>
+
+          <div>
+            <h3 className="font-semibold text-gray-900">
+              Channel Settings
+            </h3>
+            <p className="text-xs text-gray-500">
+              Configuration & permissions
+            </p>
+          </div>
         </div>
 
-        {/* CONTENT */}
-        <div className="flex-1 overflow-y-auto p-8 space-y-10 custom-scrollbar">
-          
-          {/* GENERAL INFO SECTION */}
-          <div className="space-y-6">
-            <div className="flex items-center gap-2">
-              <Info className="w-4 h-4 text-indigo-500" />
-              <h4 className="text-[11px] font-black text-slate-400 uppercase tracking-widest">General Info</h4>
-            </div>
-            
-            <div className="space-y-2">
-              <label className="text-xs font-black text-slate-300 ml-1">Channel Label</label>
-              <input
-                value={name}
-                onChange={e => setName(e.target.value)}
-                className="w-full bg-[#161922] border-2 border-white/5 rounded-xl px-4 py-3 text-sm text-white font-bold focus:border-indigo-500 focus:bg-[#1c212d] outline-none transition-all placeholder:text-slate-600"
-              />
-            </div>
+        <button
+          onClick={onClose}
+          className="p-2 rounded-md hover:bg-gray-100 text-gray-500"
+        >
+          <X className="w-5 h-5"/>
+        </button>
 
-            <div className="space-y-2">
-              <label className="text-xs font-black text-slate-300 ml-1">Description</label>
-              <textarea
-                value={description}
-                rows={3}
-                placeholder="What is this channel for?"
-                onChange={e => setDescription(e.target.value)}
-                className="w-full bg-[#161922] border-2 border-white/5 rounded-xl px-4 py-3 text-sm text-white font-medium focus:border-indigo-500 focus:bg-[#1c212d] outline-none transition-all resize-none placeholder:text-slate-600"
-              />
-            </div>
-
-            <button
-              onClick={save}
-              className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-black text-sm py-4 rounded-xl shadow-lg shadow-indigo-600/30 transition-all flex items-center justify-center gap-3 active:scale-95"
-            >
-              {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
-              Update Configuration
-            </button>
-          </div>
-
-          {/* MEMBERS SECTION */}
-          <div className="space-y-6 pt-10 border-t border-white/5">
-            <div className="flex items-center justify-between">
-              <h4 className="text-[11px] font-black text-slate-400 uppercase tracking-widest">Manage Access</h4>
-              <span className="text-[10px] font-black bg-indigo-500/10 text-indigo-400 px-3 py-1 rounded-full border border-indigo-500/20">
-                {workspace.members.length} Total Members
-              </span>
-            </div>
-
-            <div className="grid gap-3">
-              {workspace.members.map(m => {
-                const inChannel = channelMembers.some(id => String(id) === String(m.user._id));
-                return (
-                  <div
-                    key={m.user._id}
-                    className="flex items-center justify-between p-4 rounded-2xl bg-[#11141D] border border-white/5 group hover:border-indigo-500/40 transition-all"
-                  >
-                    <div className="flex items-center gap-4">
-                      <div className="w-10 h-10 rounded-xl bg-slate-800 border border-white/10 flex items-center justify-center text-sm font-black text-white uppercase">
-                        {m.user.name.charAt(0)}
-                      </div>
-                      <span className="text-sm font-bold text-slate-100">{m.user.name}</span>
-                    </div>
-
-                    <button
-                      onClick={() => inChannel ? removeMember(m.user._id) : addMember(m.user._id)}
-                      className={`p-2.5 rounded-xl transition-all border ${
-                        inChannel 
-                        ? "text-rose-400 border-rose-500/20 bg-rose-500/5 hover:bg-rose-600 hover:text-white" 
-                        : "text-indigo-400 border-indigo-500/20 bg-indigo-500/5 hover:bg-indigo-600 hover:text-white"
-                      }`}
-                    >
-                      {inChannel ? <UserMinus className="w-5 h-5" /> : <UserPlus className="w-5 h-5" />}
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* DANGER ZONE */}
-          {channel.name !== "general" && (
-            <div className="pt-10 mt-10 border-t border-rose-500/20">
-              <div className="bg-rose-500/5 border border-rose-500/10 rounded-2xl p-6">
-                <div className="flex items-center gap-2 mb-4">
-                  <ShieldAlert className="w-4 h-4 text-rose-500" />
-                  <span className="text-[11px] font-black text-rose-500 uppercase tracking-widest">Danger Zone</span>
-                </div>
-                <button
-                  onClick={deleteChannel}
-                  className="flex items-center gap-3 text-rose-500 hover:text-rose-400 font-bold text-sm transition-all group"
-                >
-                  <Trash2 className="w-5 h-5 group-hover:rotate-12 transition-transform" />
-                  Delete this channel permanently
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
       </div>
 
-      <style>{`
-        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 10px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #6366f1; }
-      `}</style>
-    </>
-  );
+
+      {/* CONTENT */}
+      <div className="flex-1 overflow-y-auto p-6 space-y-8">
+
+        {/* GENERAL INFO */}
+
+        <div className="space-y-4">
+
+          <div className="flex items-center gap-2 text-gray-600 text-xs font-medium uppercase">
+            <Info className="w-4 h-4"/>
+            General
+          </div>
+
+          <div>
+            <label className="text-sm text-gray-600">
+              Channel Name
+            </label>
+
+            <input
+              value={name}
+              onChange={e => setName(e.target.value)}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 mt-1 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            />
+          </div>
+
+          <div>
+            <label className="text-sm text-gray-600">
+              Description
+            </label>
+
+            <textarea
+              rows={3}
+              value={description}
+              onChange={e => setDescription(e.target.value)}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 mt-1 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            />
+          </div>
+
+          <button
+            onClick={save}
+            className="flex items-center justify-center gap-2 w-full bg-indigo-600 hover:bg-indigo-500 text-white py-2 rounded-lg font-medium transition"
+          >
+            {saving ? (
+              <Loader2 className="w-4 h-4 animate-spin"/>
+            ) : (
+              <Save className="w-4 h-4"/>
+            )}
+            Save Changes
+          </button>
+
+        </div>
+
+
+        {/* MEMBERS */}
+
+        <div className="space-y-4 border-t pt-6">
+
+          <div className="flex items-center justify-between">
+            <span className="text-xs uppercase text-gray-500 font-medium">
+              Channel Members
+            </span>
+
+            <span className="text-xs text-indigo-600 font-medium">
+              {workspace.members.length} users
+            </span>
+          </div>
+
+          <div className="space-y-2">
+
+            {workspace.members.map(m => {
+
+              const inChannel = channelMembers.some(
+                id => String(id) === String(m.user._id)
+              );
+
+              return (
+                <div
+                  key={m.user._id}
+                  className="flex items-center justify-between p-3 border border-gray-200 rounded-lg"
+                >
+
+                  <div className="flex items-center gap-3">
+
+                    <div className="w-8 h-8 rounded-full bg-indigo-600 text-white flex items-center justify-center text-xs font-semibold">
+                      {m.user.name[0]}
+                    </div>
+
+                    <span className="text-sm text-gray-800">
+                      {m.user.name}
+                    </span>
+
+                  </div>
+
+                  <button
+                    onClick={() =>
+                      inChannel
+                        ? removeMember(m.user._id)
+                        : addMember(m.user._id)
+                    }
+                    className={`p-2 rounded-md transition ${
+                      inChannel
+                        ? "text-red-600 hover:bg-red-50"
+                        : "text-indigo-600 hover:bg-indigo-50"
+                    }`}
+                  >
+                    {inChannel ? (
+                      <UserMinus className="w-4 h-4"/>
+                    ) : (
+                      <UserPlus className="w-4 h-4"/>
+                    )}
+                  </button>
+
+                </div>
+              );
+            })}
+
+          </div>
+
+        </div>
+
+
+        {/* DELETE */}
+
+        {channel.name !== "general" && (
+
+          <div className="border-t pt-6">
+
+            <div className="p-4 border border-red-200 bg-red-50 rounded-lg">
+
+              <div className="flex items-center gap-2 text-red-600 text-sm font-medium mb-3">
+                <ShieldAlert className="w-4 h-4"/>
+                Danger Zone
+              </div>
+
+              <button
+                onClick={deleteChannel}
+                className="flex items-center gap-2 text-red-600 hover:text-red-700 text-sm font-medium"
+              >
+                <Trash2 className="w-4 h-4"/>
+                Delete Channel
+              </button>
+
+            </div>
+
+          </div>
+
+        )}
+
+      </div>
+    </div>
+  </>
+);
 };
 
 export default ChannelSettings;

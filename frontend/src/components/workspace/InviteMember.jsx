@@ -26,62 +26,73 @@ const InviteMember = ({ workspaceId }) => {
   };
 
   return (
-    <div className="w-full transition-all duration-500">
-      <div className="flex items-center gap-2 mb-3 ml-1">
-        <Mail className="w-4 h-4 text-indigo-400" />
-        <h3 className="text-[11px] font-black text-slate-300 uppercase tracking-[0.2em]">
-          Add Personnel
-        </h3>
-      </div>
+  <div className="w-full">
 
-      <div className="relative group">
-        <div className="flex flex-col sm:flex-row gap-3 bg-[#08090D] p-1.5 rounded-2xl border border-white/10 focus-within:border-indigo-500/50 transition-all shadow-2xl">
-          <div className="flex-1 relative flex items-center">
-            <div className="absolute left-4 text-slate-500 group-focus-within:text-indigo-400 transition-colors">
-              <Mail className="w-4 h-4" />
-            </div>
-            <input
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && invite()}
-              placeholder="operator@system.com"
-              className="w-full bg-transparent border-none pl-11 pr-4 py-3 text-sm text-white font-bold placeholder:text-slate-700 focus:ring-0"
-            />
-          </div>
+    {/* HEADER */}
 
-          <button
-            onClick={invite}
-            disabled={loading || !email.trim()}
-            className="flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-800 disabled:text-slate-600 text-white px-6 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all active:scale-95 shadow-lg shadow-indigo-600/20"
-          >
-            {loading ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
-              <>
-                <span>Transmit</span>
-                <Send className="w-3.5 h-3.5" />
-              </>
-            )}
-          </button>
-        </div>
-
-        {/* IN-UI FEEDBACK (Replaces generic alerts) */}
-        {status === "success" && (
-          <div className="absolute -bottom-8 left-1 flex items-center gap-2 text-emerald-400 animate-in fade-in slide-in-from-top-1">
-            <CheckCircle2 className="w-3.5 h-3.5" />
-            <span className="text-[10px] font-black uppercase tracking-widest">Invitation Dispatched</span>
-          </div>
-        )}
-
-        {status === "error" && (
-          <div className="absolute -bottom-8 left-1 flex items-center gap-2 text-rose-500 animate-in fade-in slide-in-from-top-1">
-            <AlertCircle className="w-3.5 h-3.5" />
-            <span className="text-[10px] font-black uppercase tracking-widest">Transmission Failed</span>
-          </div>
-        )}
-      </div>
+    <div className="flex items-center gap-2 mb-3">
+      <Mail className="w-4 h-4 text-indigo-600" />
+      <h3 className="text-xs font-semibold text-gray-700 uppercase tracking-wider">
+        Invite Member
+      </h3>
     </div>
-  );
+
+
+    {/* INPUT AREA */}
+
+    <div className="border border-gray-200 rounded-lg p-2 bg-white flex flex-col sm:flex-row gap-2">
+
+      <div className="flex items-center flex-1 relative">
+
+        <Mail className="absolute left-3 w-4 h-4 text-gray-400"/>
+
+        <input
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && invite()}
+          placeholder="user@email.com"
+          className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+        />
+
+      </div>
+
+
+      <button
+        onClick={invite}
+        disabled={loading || !email.trim()}
+        className="flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-md text-sm font-medium disabled:opacity-50 transition"
+      >
+        {loading ? (
+          <Loader2 className="w-4 h-4 animate-spin"/>
+        ) : (
+          <>
+            Invite
+            <Send className="w-4 h-4"/>
+          </>
+        )}
+      </button>
+
+    </div>
+
+
+    {/* FEEDBACK */}
+
+    {status === "success" && (
+      <div className="flex items-center gap-2 mt-2 text-green-600 text-sm">
+        <CheckCircle2 className="w-4 h-4"/>
+        Invitation sent successfully
+      </div>
+    )}
+
+    {status === "error" && (
+      <div className="flex items-center gap-2 mt-2 text-red-600 text-sm">
+        <AlertCircle className="w-4 h-4"/>
+        Failed to send invite
+      </div>
+    )}
+
+  </div>
+);
 };
 
 export default InviteMember;

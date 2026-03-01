@@ -7,7 +7,7 @@ const Workspaces = () => {
   const [workspaces, setWorkspaces] = useState([]);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
-  
+
   useEffect(() => {
     api.get("/workspaces")
       .then(res => {
@@ -18,22 +18,24 @@ const Workspaces = () => {
   }, []);
 
   return (
-    /* REMOVED overflow-hidden and added overflow-x-hidden to prevent horizontal jitter */
-    <div className="min-h-screen w-full bg-[#050505] text-white p-4 sm:p-8 md:p-12 relative overflow-x-hidden selection:bg-indigo-500/30">
-      
-      {/* AMBIENT BACKGROUND DECOR - Changed to 'fixed' so they stay in place while you scroll */}
-      <div className="fixed top-0 right-0 w-[500px] h-[500px] bg-indigo-600/5 blur-[120px] pointer-events-none z-0" />
-      <div className="fixed bottom-0 left-0 w-[500px] h-[500px] bg-purple-600/5 blur-[120px] pointer-events-none z-0" />
+    <div className="min-h-screen w-full bg-gray-50 text-gray-900 p-4 sm:p-8 md:p-12 relative overflow-x-hidden">
+
+      {/* soft ambient glow */}
+      <div className="fixed top-0 right-0 w-[500px] h-[500px] bg-indigo-200/40 blur-[160px] pointer-events-none" />
+      <div className="fixed bottom-0 left-0 w-[500px] h-[500px] bg-purple-200/40 blur-[160px] pointer-events-none" />
 
       <div className="max-w-6xl mx-auto relative z-10">
-        
-        {/* HEADER SECTION */}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6 mb-12 animate-in slide-in-from-top-4 duration-700">
+
+        {/* HEADER */}
+
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6 mb-12">
+
           <div>
-            <h1 className="text-4xl font-black tracking-tighter sm:text-6xl mb-2 bg-gradient-to-r from-white to-slate-500 bg-clip-text text-transparent">
+            <h1 className="text-4xl font-black tracking-tight sm:text-5xl mb-2">
               Workspaces
             </h1>
-            <p className="text-slate-500 font-bold uppercase tracking-[0.2em] text-xs flex items-center gap-2">
+
+            <p className="text-gray-500 font-bold uppercase tracking-[0.2em] text-xs flex items-center gap-2">
               <Shield className="w-4 h-4 text-indigo-500" />
               Secure Collaborations: {workspaces.length}
             </p>
@@ -41,73 +43,96 @@ const Workspaces = () => {
 
           <button
             onClick={() => navigate("/workspaces/create")}
-            className="group relative flex items-center gap-3 bg-indigo-600 hover:bg-indigo-500 text-white px-8 py-4 rounded-2xl font-black text-sm shadow-[0_15px_30px_-10px_rgba(79,70,229,0.4)] transition-all active:scale-95"
+            className="group flex items-center gap-3 bg-indigo-600 hover:bg-indigo-500 text-white px-8 py-4 rounded-xl font-bold text-sm shadow-md transition active:scale-95"
           >
-            <Plus className="w-5 h-5 group-hover:rotate-90 transition-transform duration-300" />
-            Initialize New Unit
+            <Plus className="w-5 h-5 group-hover:rotate-90 transition-transform" />
+            Create Workspace
           </button>
+
         </div>
 
-        {/* LOADING STATE */}
+        {/* LOADING */}
+
         {loading && (
           <div className="flex flex-col items-center justify-center py-32">
             <Loader2 className="w-12 h-12 text-indigo-600 animate-spin mb-6" />
-            <span className="text-slate-400 font-black uppercase tracking-[0.3em] text-xs animate-pulse">
-              Accessing Database...
+            <span className="text-gray-500 font-bold uppercase tracking-[0.3em] text-xs">
+              Loading Workspaces
             </span>
           </div>
         )}
 
-        {/* EMPTY STATE */}
+        {/* EMPTY */}
+
         {!loading && workspaces.length === 0 && (
-          <div className="text-center py-32 border-2 border-dashed border-white/5 rounded-[40px] bg-white/[0.01] backdrop-blur-sm">
-            <Globe className="w-16 h-16 text-slate-700 mx-auto mb-6 opacity-50" />
-            <h2 className="text-2xl font-bold text-slate-300 mb-2 tracking-tight">No active deployments found.</h2>
-            <p className="text-slate-500 text-sm max-w-xs mx-auto font-medium leading-relaxed">
-              Create your first workspace to begin orchestrating your team and projects.
+          <div className="text-center py-32 border border-gray-200 rounded-3xl bg-white shadow-sm">
+
+            <Globe className="w-16 h-16 text-gray-300 mx-auto mb-6" />
+
+            <h2 className="text-xl font-bold text-gray-800 mb-2">
+              No Workspaces Yet
+            </h2>
+
+            <p className="text-gray-500 text-sm max-w-xs mx-auto">
+              Create your first workspace to start collaborating with your team.
             </p>
+
           </div>
         )}
 
-        {/* WORKSPACE GRID */}
+        {/* GRID */}
+
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 pb-20">
+
           {workspaces.map((ws, index) => (
+
             <div
               key={ws._id}
               onClick={() => navigate(`/workspaces/${ws._id}`)}
               style={{ animationDelay: `${index * 50}ms` }}
-              className="group relative flex flex-col justify-between bg-[#0F111A] border border-white/10 p-8 rounded-[32px] cursor-pointer 
-                         hover:bg-[#131622] hover:border-indigo-500/50 hover:shadow-[0_30px_60px_-15px_rgba(0,0,0,0.7)] 
-                         transition-all duration-500 hover:-translate-y-3 animate-in fade-in slide-in-from-bottom-4"
+              className="group relative flex flex-col justify-between bg-white border border-gray-200 p-8 rounded-2xl cursor-pointer 
+                         hover:border-indigo-300 hover:shadow-lg 
+                         transition-all duration-300 hover:-translate-y-1"
             >
-              {/* DECORATIVE CARD GLOW */}
-              <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/5 blur-3xl group-hover:bg-indigo-500/15 transition-all duration-500" />
 
-              <div>
-                <div className="w-14 h-14 rounded-2xl bg-[#1A1D26] border border-white/5 flex items-center justify-center mb-8 group-hover:bg-indigo-600 group-hover:border-indigo-400/50 transition-all duration-500 shadow-xl">
-                  <LayoutGrid className="w-7 h-7 text-slate-400 group-hover:text-white transition-colors" />
-                </div>
-                
-                <h2 className="text-2xl font-black text-white tracking-tight mb-4 group-hover:text-indigo-400 transition-colors">
-                  {ws.name}
-                </h2>
-                
-                <p className="text-slate-400 text-[15px] font-medium leading-relaxed line-clamp-3 group-hover:text-slate-300 transition-colors">
-                  {ws.description || "Active high-performance workspace with no specific objective defined."}
-                </p>
+              {/* ICON */}
+
+              <div className="w-14 h-14 rounded-xl bg-gray-100 border border-gray-200 flex items-center justify-center mb-8 group-hover:bg-indigo-600 transition">
+
+                <LayoutGrid className="w-7 h-7 text-gray-500 group-hover:text-white transition-colors"/>
+
               </div>
 
-              <div className="mt-12 flex items-center justify-between border-t border-white/5 pt-6">
-                <span className="text-[11px] font-black uppercase tracking-[0.2em] text-slate-600 group-hover:text-indigo-400 transition-colors">
-                  Establish Connection
+              {/* TITLE */}
+
+              <h2 className="text-xl font-bold text-gray-900 mb-3 group-hover:text-indigo-600 transition-colors">
+                {ws.name}
+              </h2>
+
+              {/* DESCRIPTION */}
+
+              <p className="text-gray-500 text-sm leading-relaxed line-clamp-3">
+                {ws.description || "Collaborative development workspace."}
+              </p>
+
+              {/* FOOTER */}
+
+              <div className="mt-10 flex items-center justify-between border-t border-gray-100 pt-6">
+
+                <span className="text-[11px] font-bold uppercase tracking-[0.2em] text-gray-400">
+                  Open Workspace
                 </span>
-                <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center group-hover:bg-indigo-600 group-hover:shadow-[0_0_15px_rgba(79,70,229,0.5)] transition-all duration-300">
-                  <ChevronRight className="w-5 h-5 text-slate-500 group-hover:text-white" />
-                </div>
+
+                <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-indigo-600 group-hover:translate-x-1 transition-all"/>
+
               </div>
+
             </div>
+
           ))}
+
         </div>
+
       </div>
 
       <style>{`
@@ -118,6 +143,7 @@ const Workspaces = () => {
           overflow: hidden;
         }
       `}</style>
+
     </div>
   );
 };

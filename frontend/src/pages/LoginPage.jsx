@@ -2,14 +2,14 @@ import { useState } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import api from "../api/axios";
-import { Lock, Mail, Loader2, ArrowRight, ShieldCheck } from "lucide-react";
+import { Mail, Lock, Loader2, ArrowRight } from "lucide-react";
 
 const LoginPage = () => {
   const { login } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const redirect = new URLSearchParams(location.search).get("redirect");
-  
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -17,7 +17,7 @@ const LoginPage = () => {
 
   const submit = async () => {
     if (!email || !password) {
-      setError("Authorization credentials required");
+      setError("Email and password required");
       return;
     }
 
@@ -28,110 +28,105 @@ const LoginPage = () => {
       const res = await api.post("/auth/login", { email, password });
       login(res.data.token);
       navigate(redirect || "/");
-    } catch (err) {
-      setError("Identity verification failed. Invalid credentials.");
+    } catch {
+      setError("Invalid credentials");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#050505] px-4 relative overflow-hidden">
-      
-      {/* AMBIENT BACKGROUND GLOW */}
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-indigo-600/10 blur-[120px] pointer-events-none" />
+    <div className="min-h-screen flex items-center justify-center px-4 bg-gradient-to-br from-indigo-50 via-white to-pink-50">
 
-      <div className="relative bg-[#0F111A] border border-white/10 w-full max-w-md p-10 rounded-[40px] shadow-2xl animate-in fade-in zoom-in duration-500">
-        
-        {/* BRANDING */}
-        <div className="flex justify-center mb-8">
-          <div className="relative group">
-            <div className="absolute -inset-1 bg-indigo-500 rounded-2xl blur opacity-25 group-hover:opacity-50 transition duration-1000"></div>
-            <div className="relative w-16 h-16 rounded-2xl bg-indigo-600 flex items-center justify-center text-white font-black text-2xl shadow-xl transform group-hover:rotate-3 transition-transform">
-              D
-            </div>
+      <div className="w-full max-w-md bg-white border border-gray-100 rounded-3xl p-8 shadow-lg">
+
+        {/* LOGO */}
+        <div className="flex justify-center mb-6">
+          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-indigo-600 to-pink-500 flex items-center justify-center text-white font-bold text-lg shadow-md">
+            D
           </div>
         </div>
 
-        <div className="text-center mb-10">
-          <h2 className="text-3xl font-black text-white tracking-tighter mb-2">
-            System Login
+        {/* HEADER */}
+        <div className="text-center mb-8">
+          <h2 className="text-2xl font-bold text-slate-900">
+            Welcome back
           </h2>
-          <p className="text-xs font-bold text-slate-500 uppercase tracking-[0.2em]">
-            Access your developer terminal
+          <p className="text-sm text-slate-500">
+            Login to your Devgram account
           </p>
         </div>
 
         {error && (
-          <div className="bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs font-bold px-4 py-3 rounded-xl mb-6 flex items-center gap-3">
-            <div className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse" />
+          <div className="bg-red-50 border border-red-200 text-red-600 text-sm px-4 py-2 rounded-lg mb-4">
             {error}
           </div>
         )}
 
-        {/* INPUTS */}
-        <div className="space-y-4">
-          <div className="relative group">
-            <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-indigo-400 transition-colors">
-              <Mail className="w-4 h-4" />
-            </div>
+        {/* EMAIL */}
+        <div className="mb-4">
+          <label className="text-sm font-semibold text-slate-700 mb-1 block">
+            Email
+          </label>
+
+          <div className="flex items-center gap-2 border border-gray-200 rounded-xl px-3 py-2">
+            <Mail className="w-4 h-4 text-slate-500" />
             <input
               type="email"
-              placeholder="Email Address"
-              className="w-full bg-[#161925] border-2 border-white/5 rounded-2xl pl-12 pr-4 py-4 text-sm text-white font-bold placeholder:text-slate-700 focus:outline-none focus:border-indigo-500/50 transition-all shadow-inner"
+              placeholder="you@example.com"
+              className="flex-1 outline-none text-sm"
               value={email}
-              onChange={e => setEmail(e.target.value)}
-            />
-          </div>
-
-          <div className="relative group">
-            <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-indigo-400 transition-colors">
-              <Lock className="w-4 h-4" />
-            </div>
-            <input
-              type="password"
-              placeholder="Security Key"
-              className="w-full bg-[#161925] border-2 border-white/5 rounded-2xl pl-12 pr-4 py-4 text-sm text-white font-bold placeholder:text-slate-700 focus:outline-none focus:border-indigo-500/50 transition-all shadow-inner"
-              value={password}
-              onChange={e => setPassword(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && submit()}
+              onChange={(e) => setEmail(e.target.value)}
             />
           </div>
         </div>
-        
-        {/* SUBMIT */}
+
+        {/* PASSWORD */}
+        <div className="mb-6">
+          <label className="text-sm font-semibold text-slate-700 mb-1 block">
+            Password
+          </label>
+
+          <div className="flex items-center gap-2 border border-gray-200 rounded-xl px-3 py-2">
+            <Lock className="w-4 h-4 text-slate-500" />
+            <input
+              type="password"
+              placeholder="Enter password"
+              className="flex-1 outline-none text-sm"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && submit()}
+            />
+          </div>
+        </div>
+
+        {/* LOGIN BUTTON */}
         <button
           onClick={submit}
           disabled={loading}
-          className="w-full mt-8 relative overflow-hidden group bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white py-4 rounded-2xl font-black text-sm uppercase tracking-[0.2em] shadow-[0_20px_40px_-10px_rgba(79,70,229,0.4)] transition-all active:scale-[0.98] flex items-center justify-center gap-3"
+          className="w-full bg-indigo-600 hover:bg-indigo-500 text-white py-3 rounded-xl font-semibold flex items-center justify-center gap-2 transition"
         >
           {loading ? (
             <Loader2 className="w-5 h-5 animate-spin" />
           ) : (
             <>
-              Authorize Access
-              <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+              Login
+              <ArrowRight className="w-4 h-4" />
             </>
           )}
         </button>
 
         {/* FOOTER */}
-        <div className="mt-10 pt-8 border-t border-white/5 flex flex-col items-center gap-4">
-          <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">
-            First time deploying here?{" "}
-            <Link
-              to="/register"
-              className="text-indigo-400 hover:text-white transition-colors"
-            >
-              Initialize Account
-            </Link>
-          </p>
-          
-          <div className="flex items-center gap-2 opacity-30">
-            <ShieldCheck className="w-3 h-3 text-slate-400" />
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Secure Handshake Protocol</span>
-          </div>
-        </div>
+        <p className="text-center text-sm text-slate-500 mt-6">
+          Don’t have an account?{" "}
+          <Link
+            to="/register"
+            className="text-indigo-600 font-semibold hover:underline"
+          >
+            Sign up
+          </Link>
+        </p>
+
       </div>
     </div>
   );

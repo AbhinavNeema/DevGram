@@ -6,35 +6,41 @@ const MentionInput = ({
   value,
   onChange,
   onMentionsChange,
-  placeholder,
-  rows = 3
+  placeholder = "Write a comment... @user",
+  rows = 1
 }) => {
   const [query, setQuery] = useState("");
   const [suggestions, setSuggestions] = useState([]);
   const ref = useRef(null);
   const boxRef = useRef(null);
+  const debounceRef = useRef(null);
 
-  /* 🔹 Same Logic 🔹 */
+  /* 🔹 Debounced fetch for suggestions (lightweight) 🔹 */
   useEffect(() => {
     if (!query) {
       setSuggestions([]);
       return;
     }
 
-    const fetchUsers = async () => {
+    // debounce
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(async () => {
       try {
-        const res = await api.get(`/search?q=${query}`);
+        const res = await api.get(`/search?q=${encodeURIComponent(query)}`);
         setSuggestions(res.data.users || []);
       } catch (err) {
         console.error("Mention search failed", err);
+        setSuggestions([]);
       }
-    };
+    }, 220);
 
-    fetchUsers();
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
   }, [query]);
 
   useEffect(() => {
-    const handleClickOutside = e => {
+    const handleClickOutside = (e) => {
       if (boxRef.current && !boxRef.current.contains(e.target)) {
         setSuggestions([]);
         setQuery("");
@@ -45,7 +51,7 @@ const MentionInput = ({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const handleChange = e => {
+  const handleChange = (e) => {
     const text = e.target.value;
     onChange(text);
 
@@ -56,15 +62,15 @@ const MentionInput = ({
     setQuery(match ? match[1] : "");
   };
 
-  const selectUser = user => {
+  const selectUser = (user) => {
     const cursor = ref.current.selectionStart;
     const before = value.slice(0, cursor).replace(/@([a-z0-9_.]{1,30})$/i, "");
     const after = value.slice(cursor);
 
     onChange(`${before}@${user.username} ${after}`);
 
-    onMentionsChange?.(prev =>
-      prev.find(u => u._id === user._id) ? prev : [...prev, user]
+    onMentionsChange?.((prev) =>
+      prev?.find((u) => u._id === user._id) ? prev : [...(prev || []), user]
     );
 
     setQuery("");
@@ -74,53 +80,49 @@ const MentionInput = ({
 
   return (
     <div ref={boxRef} className="relative w-full group">
-      {/* TEXTAREA CONTAINER */}
-      <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-[#0F111A] transition-all duration-300 focus-within:border-indigo-500/50 focus-within:ring-4 focus-within:ring-indigo-500/10 shadow-inner">
+      {/* compact single-line textarea container (light theme) */}
+      <div className="relative overflow-hidden rounded-full border border-gray-200 bg-white transition-all duration-150 focus-within:ring-1 focus-within:ring-indigo-100">
         <textarea
           ref={ref}
           value={value}
           rows={rows}
           onChange={handleChange}
           placeholder={placeholder}
-          className="w-full bg-transparent px-4 py-3 text-sm text-white placeholder:text-slate-600 outline-none transition-all resize-none font-medium leading-relaxed"
+          className="w-full bg-transparent px-3 py-1 text-sm text-slate-800 placeholder:text-slate-400 outline-none transition-all resize-none font-medium leading-tight"
         />
-        
-        {/* SUBTLE INDICATOR */}
-        <div className="absolute bottom-2 right-3 pointer-events-none opacity-20 group-focus-within:opacity-100 transition-opacity">
-           <AtSign className="w-3.5 h-3.5 text-indigo-400" />
+
+        {/* subtle at-sign indicator */}
+        <div className="absolute bottom-1.5 right-3 pointer-events-none opacity-30 transition-opacity">
+          <AtSign className="w-3.5 h-3.5 text-indigo-400" />
         </div>
       </div>
 
-      {/* SUGGESTIONS DROPDOWN: High Visibility Glassmorphism */}
+      {/* suggestions dropdown - compact, light, and non-obtrusive */}
       {suggestions.length > 0 && (
-        <div className="absolute bottom-full left-0 z-50 mb-2 w-full max-h-64 overflow-y-auto rounded-2xl border border-white/10 bg-[#161925]/95 p-2 shadow-[0_20px_50px_rgba(0,0,0,0.5)] backdrop-blur-xl animate-in fade-in slide-in-from-bottom-2 custom-scrollbar">
-          <div className="px-3 py-2 mb-1 border-b border-white/5 flex items-center justify-between">
-            <span className="text-[10px] font-black uppercase tracking-[0.2em] text-indigo-400">Database Match</span>
-            <Zap className="w-3 h-3 text-indigo-500 fill-current" />
+        <div className="absolute bottom-full left-0 z-50 mb-2 w-full max-h-48 overflow-y-auto rounded-lg border border-gray-200 bg-white p-1 shadow-lg custom-scrollbar">
+          <div className="px-2 py-1 mb-1 border-b border-gray-100 flex items-center justify-between">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-600">Matches</span>
+            <Zap className="w-3 h-3 text-indigo-500" />
           </div>
-          
-          <div className="space-y-1">
-            {suggestions.map(u => (
+
+          <div className="space-y-1 px-1">
+            {suggestions.map((u) => (
               <div
                 key={u._id}
                 onClick={() => selectUser(u)}
-                className="group/item flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer hover:bg-indigo-600 transition-all duration-200"
+                className="group flex items-center gap-3 px-2 py-2 rounded-md cursor-pointer hover:bg-indigo-50 transition-colors"
               >
-                <div className="w-8 h-8 rounded-lg bg-slate-800 flex items-center justify-center border border-white/10 group-hover/item:bg-white/20 transition-colors">
-                  <User className="w-4 h-4 text-slate-400 group-hover/item:text-white" />
-                </div>
-                
-                <div className="flex flex-col">
-                  <span className="text-sm font-black text-white group-hover/item:text-white transition-colors">
-                    @{u.username}
-                  </span>
-                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-tighter group-hover/item:text-indigo-200">
-                    {u.name || "Personnel"}
-                  </span>
+                <div className="w-8 h-8 rounded-md bg-indigo-50 flex items-center justify-center text-[12px] font-bold text-indigo-700 flex-shrink-0 border border-indigo-100">
+                  {u.name?.[0]?.toUpperCase() || u.username?.[0]?.toUpperCase() || <User className="w-4 h-4" />}
                 </div>
 
-                <div className="ml-auto opacity-0 group-hover/item:opacity-100 transition-opacity">
-                  <div className="bg-white/20 px-2 py-0.5 rounded text-[10px] font-black text-white uppercase">Tag</div>
+                <div className="flex flex-col">
+                  <span className="text-sm font-semibold text-slate-900">@{u.username}</span>
+                  <span className="text-[11px] text-slate-500">{u.name || "No name"}</span>
+                </div>
+
+                <div className="ml-auto opacity-0 group-hover:opacity-100 transition-opacity">
+                  <div className="bg-indigo-600 text-white text-[11px] px-2 py-0.5 rounded">Tag</div>
                 </div>
               </div>
             ))}
@@ -129,8 +131,8 @@ const MentionInput = ({
       )}
 
       <style>{`
-        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 10px; }
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(15,23,42,0.08); border-radius: 8px; }
       `}</style>
     </div>
   );

@@ -1,30 +1,36 @@
 import { Link, useNavigate } from "react-router-dom";
 import { useState } from "react";
-import { 
-  Search, 
-  Plus, 
-  MessageSquare, 
-  TrendingUp, 
-  Layers, 
-  LogOut, 
+import {
+  Search,
+  Plus,
+  MessageSquare,
+  TrendingUp,
+  Layers,
+  LogOut,
   Command,
   Layout
 } from "lucide-react";
 
+/** safer token parsing helper (used across components) */
+const safeGetUser = () => {
+  try {
+    const token = localStorage.getItem("token");
+    if (!token) return null;
+    const payload = JSON.parse(atob(token.split(".")[1]));
+    return {
+      id: payload.sub || payload.id || null,
+      name: payload.name || null
+    };
+  } catch {
+    return null;
+  }
+};
+
 const Navbar = () => {
   const navigate = useNavigate();
-  const token = localStorage.getItem("token");
-
-  let userId = null;
-  let userInitial = "U";
-
-  try {
-    if (token) {
-      const decoded = JSON.parse(atob(token.split(".")[1]));
-      userId = decoded.sub || decoded.id;
-      userInitial = decoded.name?.[0]?.toUpperCase() || "U";
-    }
-  } catch {}
+  const user = safeGetUser();
+  const userId = user?.id || null;
+  const userInitial = user?.name?.[0]?.toUpperCase() || "U";
 
   const [search, setSearch] = useState("");
 
@@ -41,62 +47,57 @@ const Navbar = () => {
   };
 
   return (
-    <nav className="sticky top-0 z-[100] w-full border-b border-white/10 bg-[#08090D]/80 backdrop-blur-xl transition-all duration-300">
+    <nav className="sticky top-0 z-50 w-full bg-white border-b border-gray-100 shadow-sm">
       <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex h-16 items-center justify-between gap-4">
-          
-          {/* LEFT: Branding */}
-          <div className="flex items-center gap-8">
-            <Link 
-              to="/" 
-              className="group flex items-center gap-3 outline-none"
-            >
-              <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center shadow-[0_0_20px_rgba(79,70,229,0.4)] group-hover:rotate-12 transition-all duration-300">
-                <Layout className="text-white w-6 h-6 stroke-[2.5px]" />
+        <div className="flex h-14 items-center justify-between gap-4">
+          {/* LEFT: Branding + Search */}
+          <div className="flex items-center gap-6">
+            <Link to="/" className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-500 to-pink-500 flex items-center justify-center shadow-md transition-transform group-hover:rotate-6">
+                <Layout className="text-white w-5 h-5 stroke-[2]" />
               </div>
-              <span className="hidden lg:block text-xl font-black tracking-tighter text-white uppercase italic">
+
+              <span className="hidden lg:block text-lg font-extrabold tracking-tight text-slate-900 uppercase">
                 DevGram
               </span>
             </Link>
 
-            {/* Search - Command Palette Style (Visible on Desktop) */}
-            <form
-              onSubmit={handleSearch}
-              className="hidden md:flex items-center relative group w-64 lg:w-96"
-            >
+            {/* Desktop Search (compact, command-palette hint) */}
+            <form onSubmit={handleSearch} className="hidden md:flex items-center relative w-[20rem] lg:w-[28rem]">
               <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
-                <Search className="w-4 h-4 text-slate-500 group-focus-within:text-indigo-400 transition-colors" />
+                <Search className="w-4 h-4 text-slate-400" />
               </div>
+
               <input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Search database..."
-                className="w-full bg-white/5 border border-white/10 pl-10 pr-4 py-2 rounded-xl text-sm text-white placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all font-medium"
+                className="w-full bg-gray-50 border border-gray-100 pl-10 pr-10 py-2 rounded-xl text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-indigo-100 focus:border-indigo-300 transition"
               />
+
               <div className="absolute inset-y-0 right-3 flex items-center gap-1 pointer-events-none">
-                <Command className="w-3 h-3 text-slate-600" />
-                <span className="text-[10px] font-black text-slate-600">K</span>
+                <Command className="w-3 h-3 text-slate-500" />
+                <span className="text-[10px] font-semibold text-slate-500">K</span>
               </div>
             </form>
           </div>
-          
+
           {/* RIGHT: Actions */}
-          <div className="flex items-center gap-1 sm:gap-3">
-            
-            {/* Nav Links (Hidden on small mobile) */}
-            <div className="hidden sm:flex items-center gap-1 mr-2">
+          <div className="flex items-center gap-2 sm:gap-4">
+            <div className="hidden sm:flex items-center gap-2">
               <Link
                 to="/dm"
-                className="p-2.5 text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all relative"
+                className="p-2.5 text-slate-600 hover:text-slate-900 hover:bg-gray-50 rounded-xl transition"
                 title="Messages"
               >
                 <MessageSquare className="w-5 h-5" />
-                <span className="absolute top-2 right-2 w-2 h-2 bg-indigo-500 rounded-full border-2 border-[#08090D]"></span>
+                <span className="sr-only">Messages</span>
+                <span className="absolute top-3 right-6 inline-block w-2 h-2 bg-indigo-500 rounded-full ring-2 ring-white"></span>
               </Link>
 
               <Link
                 to="/trending"
-                className="p-2.5 text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all"
+                className="p-2.5 text-slate-600 hover:text-slate-900 hover:bg-gray-50 rounded-xl transition"
                 title="Trending"
               >
                 <TrendingUp className="w-5 h-5" />
@@ -104,53 +105,51 @@ const Navbar = () => {
 
               <Link
                 to="/workspaces"
-                className="p-2.5 text-slate-400 hover:text-indigo-400 hover:bg-indigo-500/10 rounded-xl transition-all flex items-center gap-2"
+                className="p-2.5 text-slate-600 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition flex items-center gap-2"
                 title="Workspaces"
               >
                 <Layers className="w-5 h-5" />
-                <span className="hidden xl:inline text-xs font-black uppercase tracking-widest">Workspaces</span>
+                <span className="hidden xl:inline text-xs font-semibold uppercase tracking-wider text-slate-700">Workspaces</span>
               </Link>
             </div>
 
-            {/* Primary Action */}
+            {/* Primary CTA */}
             <Link
               to="/create"
-              className="inline-flex items-center gap-2 bg-indigo-600 text-white px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-indigo-500 active:scale-95 transition-all shadow-[0_10px_20px_-5px_rgba(79,70,229,0.4)]"
+              className="inline-flex items-center gap-2 bg-gradient-to-r from-indigo-600 to-pink-500 text-white px-3 py-2 rounded-xl text-xs font-bold uppercase tracking-widest hover:opacity-95 transition shadow-sm"
             >
-              <Plus className="w-4 h-4 stroke-[3px]" />
+              <Plus className="w-4 h-4 stroke-[2]" />
               <span className="hidden md:inline">Project</span>
             </Link>
 
-            <div className="h-6 w-px bg-white/10 mx-2 hidden sm:block"></div>
+            <div className="hidden sm:block w-px h-6 bg-gray-100 mx-2" />
 
-            {/* Profile Section */}
+            {/* Profile / Auth */}
             {userId ? (
-              <div className="flex items-center gap-4">
+              <div className="flex items-center gap-3">
                 <button
                   onClick={() => navigate(`/user/${userId}`)}
-                  className="group flex items-center gap-3 outline-none"
+                  className="group flex items-center gap-2"
                 >
-                  <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-500 to-purple-600 p-[2px] transition-transform group-hover:rotate-6">
-                    <div className="w-full h-full rounded-[10px] bg-[#08090D] flex items-center justify-center">
-                      <span className="text-sm font-black text-indigo-400">
-                        {userInitial}
-                      </span>
+                  <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-500 to-purple-600 p-[2px]">
+                    <div className="w-full h-full rounded-[8px] bg-white flex items-center justify-center">
+                      <span className="text-sm font-extrabold text-indigo-600">{userInitial}</span>
                     </div>
                   </div>
                 </button>
 
                 <button
                   onClick={logout}
-                  className="hidden lg:flex items-center gap-2 text-[10px] font-black text-slate-500 hover:text-rose-500 transition-colors uppercase tracking-[0.2em]"
+                  className="hidden lg:flex items-center gap-2 text-xs font-semibold text-slate-600 hover:text-rose-500 uppercase tracking-wider"
                 >
                   <LogOut className="w-4 h-4" />
                   Logout
                 </button>
               </div>
             ) : (
-              <Link 
-                to="/login" 
-                className="text-xs font-black text-indigo-400 hover:text-indigo-300 uppercase tracking-widest border border-indigo-500/30 px-4 py-2 rounded-xl bg-indigo-500/5 transition-all"
+              <Link
+                to="/login"
+                className="text-xs font-bold text-indigo-600 hover:text-indigo-500 uppercase tracking-widest border border-indigo-100 px-3 py-2 rounded-xl bg-indigo-50"
               >
                 Sign In
               </Link>

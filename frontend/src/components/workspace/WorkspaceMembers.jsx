@@ -1,5 +1,5 @@
 import api from "../../api/axios";
-import { ShieldCheck, UserMinus, ShieldAlert, User, Star } from "lucide-react";
+import { ShieldCheck, UserMinus, ShieldAlert, Star } from "lucide-react";
 
 const WorkspaceMembers = ({ workspace, currentUserId, myRole }) => {
   const isOwner = myRole === "owner";
@@ -17,8 +17,9 @@ const WorkspaceMembers = ({ workspace, currentUserId, myRole }) => {
   };
 
   return (
-    <div className="p-1">
+    <div className="p-2">
       <div className="space-y-2">
+
         {workspace.members.map((m) => {
           const isMe = String(m.user?._id || m.user) === String(currentUserId);
           const isTargetOwner = m.role === "owner";
@@ -27,49 +28,66 @@ const WorkspaceMembers = ({ workspace, currentUserId, myRole }) => {
           return (
             <div
               key={m._id}
-              className="group flex items-center justify-between bg-[#1A1D26] border border-white/5 p-4 rounded-2xl hover:border-indigo-500/50 transition-all duration-300 shadow-lg"
+              className="group flex items-center justify-between bg-white border border-slate-200 p-4 rounded-xl hover:shadow-md transition"
             >
-              {/* USER INFO SECTION */}
+              
+              {/* USER INFO */}
               <div className="flex items-center gap-4">
+
                 <div className="relative">
-                  <div className={`w-11 h-11 rounded-xl flex items-center justify-center text-white font-black shadow-inner border border-white/10 ${
-                    isTargetOwner ? "bg-gradient-to-br from-amber-400 to-orange-600" : 
-                    isTargetAdmin ? "bg-gradient-to-br from-indigo-500 to-violet-600" : 
-                    "bg-slate-700"
-                  }`}>
+
+                  <div
+                    className={`w-10 h-10 rounded-lg flex items-center justify-center text-white font-bold ${
+                      isTargetOwner
+                        ? "bg-amber-500"
+                        : isTargetAdmin
+                        ? "bg-indigo-600"
+                        : "bg-slate-400"
+                    }`}
+                  >
                     {m.user?.name?.charAt(0).toUpperCase()}
                   </div>
+
                   {isTargetOwner && (
-                    <div className="absolute -top-2 -right-2 bg-amber-500 p-1 rounded-full border-2 border-[#1A1D26] shadow-lg">
+                    <div className="absolute -top-1 -right-1 bg-amber-400 p-1 rounded-full border-2 border-white">
                       <Star className="w-2.5 h-2.5 text-white fill-white" />
                     </div>
                   )}
+
                 </div>
 
                 <div>
-                  <div className="text-[15px] font-black text-white flex items-center gap-2 tracking-tight">
+                  <div className="text-sm font-semibold text-slate-900 flex items-center gap-2">
                     {m.user?.name}
+
                     {isMe && (
-                      <span className="text-[9px] bg-white/10 text-slate-400 px-2 py-0.5 rounded-md border border-white/5 uppercase">
+                      <span className="text-[10px] bg-slate-100 text-slate-500 px-2 py-0.5 rounded-md border">
                         You
                       </span>
                     )}
                   </div>
-                  <div className={`text-[10px] font-bold uppercase tracking-[0.1em] mt-0.5 ${
-                    isTargetOwner ? "text-amber-400" : isTargetAdmin ? "text-indigo-400" : "text-slate-500"
-                  }`}>
+
+                  <div
+                    className={`text-[11px] font-medium capitalize ${
+                      isTargetOwner
+                        ? "text-amber-600"
+                        : isTargetAdmin
+                        ? "text-indigo-600"
+                        : "text-slate-500"
+                    }`}
+                  >
                     {m.role}
                   </div>
                 </div>
               </div>
 
-              {/* ACTIONS SECTION */}
-              <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                {/* ROLE MANAGEMENT (OWNER ONLY) */}
+              {/* ACTIONS */}
+              <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition">
+
                 {isOwner && m.role === "member" && (
                   <button
                     onClick={() => changeRole(m.user._id, "admin")}
-                    className="p-2 bg-indigo-500/10 text-indigo-400 hover:bg-indigo-500 hover:text-white rounded-lg transition-all"
+                    className="p-2 text-indigo-600 hover:bg-indigo-50 rounded-lg transition"
                     title="Promote to Admin"
                   >
                     <ShieldCheck className="w-4 h-4" />
@@ -79,23 +97,23 @@ const WorkspaceMembers = ({ workspace, currentUserId, myRole }) => {
                 {isOwner && m.role === "admin" && (
                   <button
                     onClick={() => changeRole(m.user._id, "member")}
-                    className="p-2 bg-amber-500/10 text-amber-500 hover:bg-amber-500 hover:text-white rounded-lg transition-all"
+                    className="p-2 text-amber-600 hover:bg-amber-50 rounded-lg transition"
                     title="Demote to Member"
                   >
                     <ShieldAlert className="w-4 h-4" />
                   </button>
                 )}
 
-                {/* REMOVE ACTION (OWNER + ADMIN) */}
                 {(isOwner || isAdmin) && !isMe && !isTargetOwner && (
                   <button
                     onClick={() => removeMember(m.user._id)}
-                    className="p-2 bg-rose-500/10 text-rose-500 hover:bg-rose-500 hover:text-white rounded-lg transition-all"
+                    className="p-2 text-rose-600 hover:bg-rose-50 rounded-lg transition"
                     title="Remove Member"
                   >
                     <UserMinus className="w-4 h-4" />
                   </button>
                 )}
+
               </div>
             </div>
           );

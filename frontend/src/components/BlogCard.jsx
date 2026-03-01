@@ -1,48 +1,55 @@
+import React, { useState } from "react";
 import api from "../api/axios";
-import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { timeAgo } from "../utils/timeAgo";
 import { renderMentions } from "../utils/renderMentions";
 import MentionInput from "../components/MentionInput";
-import { 
-  Heart, 
-  MessageSquare, 
-  Eye, 
-  Share2, 
-  Trash2, 
-  Hash, 
-  MoreHorizontal, 
-  ChevronRight 
+import {
+  Heart,
+  MessageCircle,
+  Eye,
+  Share2,
+  Trash2,
+  Hash
 } from "lucide-react";
+
+const safeGetUserId = () => {
+  try {
+    const token = localStorage.getItem("token");
+    if (!token) return null;
+    const payload = JSON.parse(atob(token.split(".")[1]));
+    return payload?.id || null;
+  } catch {
+    return null;
+  }
+};
 
 const BlogCard = ({ blog, showOwnerActions = false }) => {
   const navigate = useNavigate();
-  const token = localStorage.getItem("token");
-  const userId = token ? JSON.parse(atob(token.split(".")[1])).id : null;
+  const userId = safeGetUserId();
 
-  const authorId = typeof blog.author === "string" ? blog.author : blog.author?._id;
-  const isOwner = String(authorId) === String(userId);
+  const isOwner =
+    blog.author?._id === userId || blog.author === userId;
+
   const content = blog.content || "";
 
   const [likesCount, setLikesCount] = useState(blog.likes?.length || 0);
   const [liked, setLiked] = useState(blog.likes?.includes(userId) || false);
   const [comments, setComments] = useState(blog.comments || []);
   const [text, setText] = useState("");
+  const [views, setViews] = useState(blog.views || 0);
   const [expanded, setExpanded] = useState(false);
   const [showAllComments, setShowAllComments] = useState(false);
   const [activeImage, setActiveImage] = useState(null);
+  const [viewed, setViewed] = useState(false);
   const [commentMentions, setCommentMentions] = useState([]);
   const [copied, setCopied] = useState(false);
-  const [views, setViews] = useState(blog.views || 0);
-  const [viewed, setViewed] = useState(false);
 
-  const handleShare = async () => {
-    const link = `${window.location.origin}/blog/${blog._id}`;
-    try {
-      await navigator.clipboard.writeText(link);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
-    } catch (err) { console.error("Copy failed", err); }
+  const handleShare = () => {
+    const url = `${window.location.origin}/blog/${blog._id}`;
+    navigator.clipboard.writeText(url);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
   };
 
   const addView = async () => {
@@ -51,11 +58,11 @@ const BlogCard = ({ blog, showOwnerActions = false }) => {
       const res = await api.post(`/blogs/${blog._id}/view`);
       setViews(res.data.views);
       setViewed(true);
-    } catch (err) {}
+    } catch {}
   };
 
   const handleLike = async () => {
-    await addView();
+    addView();
     const res = await api.put(`/blogs/${blog._id}/like`);
     setLiked(res.data.liked);
     setLikesCount(res.data.likesCount);
@@ -65,16 +72,16 @@ const BlogCard = ({ blog, showOwnerActions = false }) => {
     if (!text.trim()) return;
     const res = await api.post(`/blogs/${blog._id}/comments`, {
       text,
-      mentions: commentMentions.map(u => u._id),
+      mentions: commentMentions.map((u) => u._id)
     });
-    setComments([...comments, res.data]);
+    setComments((prev) => [...prev, res.data]);
     setText("");
     setCommentMentions([]);
   };
 
   const deleteComment = async (commentId) => {
     await api.delete(`/blogs/${blog._id}/comments/${commentId}`);
-    setComments(comments.filter(c => c._id !== commentId));
+    setComments((prev) => prev.filter((c) => c._id !== commentId));
   };
 
   const deleteBlog = async () => {
@@ -84,87 +91,82 @@ const BlogCard = ({ blog, showOwnerActions = false }) => {
   };
 
   return (
-    <div className="group bg-[#0F111A] border border-white/10 rounded-[32px] mb-8 overflow-hidden transition-all duration-500 hover:border-indigo-500/40 hover:shadow-[0_20px_50px_rgba(0,0,0,0.6)]">
+    <article className="group bg-white rounded-3xl mb-8 overflow-hidden transition-shadow duration-500 border border-gray-100 shadow-sm hover:shadow-2xl">
       
       {/* HEADER */}
-      <div className="flex items-center gap-4 px-6 py-5 bg-white/[0.02] border-b border-white/5">
-        <div className="w-12 h-12 rounded-2xl bg-indigo-600 flex items-center justify-center font-black text-white text-lg shadow-lg">
-          {blog.author?.name?.[0] || "U"}
-        </div>
+      <header className="flex items-center justify-between px-6 py-4 bg-gradient-to-r from-indigo-50 to-pink-50 border-b border-gray-100">
+        <div className="flex items-center gap-4">
+          <div className="w-12 h-12 rounded-2xl bg-indigo-600 flex items-center justify-center font-extrabold text-white text-lg shadow-md ring-4 ring-indigo-50">
+            {blog.author?.name?.[0] || "U"}
+          </div>
 
-        <div className="flex-1">
-          <Link
-            to={`/user/${blog.author?._id}`}
-            className="text-sm font-black text-white hover:text-indigo-400 transition-colors tracking-tight block"
-          >
-            {blog.author?.name}
-          </Link>
-          <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mt-0.5">
-            Technical Insight · {timeAgo(blog.createdAt)}
-          </p>
+          <div>
+            <Link
+              to={`/user/${blog.author?._id}`}
+              className="text-sm font-bold text-slate-900 hover:text-indigo-600 transition-colors tracking-tight"
+            >
+              {blog.author?.name}
+            </Link>
+            <p className="text-[11px] text-slate-500 font-medium mt-0.5">
+              Blog · {timeAgo(blog.createdAt)}
+            </p>
+          </div>
         </div>
 
         <div className="flex items-center gap-3">
-          <button 
-            onClick={handleShare} 
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
-              copied ? "bg-emerald-500 text-white" : "bg-white/5 text-slate-300 hover:bg-white/10 border border-white/5"
+          <button
+            onClick={handleShare}
+            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+              copied
+                ? "bg-emerald-500 text-white"
+                : "bg-white text-slate-700 hover:bg-gray-50 border"
             }`}
           >
-            {copied ? "Copied" : <><Share2 className="w-3.5 h-3.5" /> Share</>}
+            {copied ? "Copied" : <><Share2 className="w-4 h-4" /> Share</>}
           </button>
 
-          {showOwnerActions && isOwner && (
-            <button onClick={deleteBlog} className="p-2 text-slate-500 hover:text-rose-500 transition-colors">
+          {isOwner && showOwnerActions && (
+            <button
+              onClick={deleteBlog}
+              className="p-2 text-slate-600 hover:text-rose-600 transition-colors rounded-md"
+            >
               <Trash2 className="w-4 h-4" />
             </button>
           )}
         </div>
-      </div>
+      </header>
 
-      {/* CONTENT BODY */}
-      <div className="px-8 py-6">
-        <h3 className="text-2xl font-black text-white mb-4 tracking-tighter leading-tight">
+      {/* CONTENT */}
+      <div className="px-6 py-6">
+        <h3 className="text-2xl font-extrabold text-slate-900 mb-2 tracking-tight">
           {blog.title}
         </h3>
 
-        <div className="text-[15px] text-slate-300 font-medium leading-relaxed mb-6">
+        <div className="text-[15px] text-slate-700 font-medium leading-relaxed mb-4">
           {expanded || content.length <= 180
             ? renderMentions(content, blog.mentions)
             : renderMentions(content.slice(0, 180) + "...", blog.mentions)}
 
           {content.length > 180 && (
             <button
-              onClick={() => { setExpanded(!expanded); addView(); }}
-              className="ml-2 text-indigo-400 font-black hover:text-indigo-300 underline underline-offset-4 decoration-2"
+              onClick={() => {
+                setExpanded(!expanded);
+                addView();
+              }}
+              className="ml-2 text-indigo-600 font-semibold hover:underline"
             >
-              {expanded ? "Collapse Brief" : "Read Full Log"}
+              {expanded ? "Collapse" : "Read more"}
             </button>
           )}
         </div>
 
-        {/* IMAGE GRID */}
-        {blog.images?.length > 0 && (
-          <div className="grid grid-cols-2 gap-4 mb-6">
-            {blog.images.map((img, i) => (
-              <div 
-                key={i} 
-                className="relative aspect-video rounded-2xl overflow-hidden border border-white/10 group/img cursor-zoom-in"
-                onClick={() => { addView(); setActiveImage(img.url); }}
-              >
-                <img src={img.url} className="w-full h-full object-cover transition-transform duration-700 group-hover/img:scale-110" alt="Blog attachment" />
-              </div>
-            ))}
-          </div>
-        )}
-
         {/* TAGS */}
-        <div className="flex gap-2 flex-wrap mb-8">
-          {(blog.techStack || []).map(tag => (
+        <div className="flex gap-2 flex-wrap mb-6">
+          {(blog.techStack || []).map((tag) => (
             <Link
               key={tag}
               to={`/?tag=${encodeURIComponent(tag)}`}
-              className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest px-4 py-2 rounded-full bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 hover:bg-indigo-500 hover:text-white transition-all"
+              className="flex items-center gap-1 text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-100 hover:bg-indigo-100 transition-all"
             >
               <Hash className="w-3 h-3" />
               {tag}
@@ -172,97 +174,89 @@ const BlogCard = ({ blog, showOwnerActions = false }) => {
           ))}
         </div>
 
-        {/* INTERACTION ACTION BAR */}
-        <div className="flex gap-10 items-center pt-6 border-t border-white/5 text-slate-400">
+        {/* ACTION BAR */}
+        <div className="flex gap-6 items-center pt-4 border-t border-gray-100 text-slate-600">
           <button
             onClick={handleLike}
-            className={`flex items-center gap-2 font-black text-xs transition-all group/btn ${liked ? "text-rose-500" : "hover:text-rose-500"}`}
+            className={`flex items-center gap-2 font-semibold text-sm ${
+              liked ? "text-rose-600" : "hover:text-rose-500"
+            }`}
           >
-            <Heart className={`w-5 h-5 transition-transform ${liked ? "fill-current scale-110 shadow-[0_0_15px_rgba(244,63,94,0.4)]" : "group-hover/btn:scale-110"}`} />
+            <Heart className="w-5 h-5" />
             {likesCount}
           </button>
-          <div className="flex items-center gap-2 font-black text-xs">
-            <MessageSquare className="w-5 h-5" />
+
+          <div className="flex items-center gap-2 font-semibold text-sm">
+            <MessageCircle className="w-5 h-5 text-slate-500" />
             {comments.length}
           </div>
-          <div className="flex items-center gap-2 font-black text-xs">
-            <Eye className="w-5 h-5" />
+
+          <div className="flex items-center gap-2 font-semibold text-sm">
+            <Eye className="w-5 h-5 text-slate-500" />
             {views}
           </div>
         </div>
       </div>
 
-      {/* COMMENTS LOG SECTION */}
-      <div className="bg-black/20 border-t border-white/5 p-6 sm:p-8">
-        <div className="space-y-4 mb-6">
-          {!showAllComments && comments.length > 0 && (
-            <div className="flex items-start justify-between gap-4">
-              <div className="text-sm font-medium text-slate-300">
-                <span className="font-black text-indigo-400 mr-2 uppercase tracking-tighter">{comments[0].author?.name}</span>
-                {renderMentions(comments[0].text, comments[0].mentions)}
+      {/* COMMENTS (same as ProjectCard) */}
+      <div className="bg-gray-50 border-t border-gray-100 px-5 py-3">
+        <div className="max-h-36 overflow-y-auto mb-3">
+          {(showAllComments ? comments : comments.slice(0, 1)).map((c) => (
+            <div key={c._id} className="flex gap-3 items-start mb-2">
+              <div className="w-9 h-9 rounded-full bg-indigo-50 flex items-center justify-center text-xs font-extrabold text-indigo-700">
+                {c.author?.name?.[0] || "U"}
               </div>
-              {comments.length > 1 && (
-                <button
-                  onClick={() => setShowAllComments(true)}
-                  className="text-[10px] font-black text-slate-500 uppercase tracking-widest hover:text-white transition-colors flex items-center gap-1"
-                >
-                  View Feed <ChevronRight className="w-3 h-3" />
-                </button>
-              )}
-            </div>
-          )}
 
-          {showAllComments &&
-            comments.map(c => (
-              <div key={c._id} className="flex items-start justify-between group/comm py-1 animate-in fade-in duration-300">
-                <div className="text-sm font-medium text-slate-300">
-                   <span className="font-black text-indigo-400 mr-2 uppercase tracking-tighter">{c.author?.name}</span>
-                   {renderMentions(c.text, c.mentions)}
+              <div className="flex-1 bg-white border border-gray-100 rounded-xl p-3 shadow-sm">
+                <div className="flex items-center justify-between">
+                  <div className="flex gap-2">
+                    <span className="font-semibold text-slate-900 text-sm">
+                      {c.author?.name}
+                    </span>
+                    <span className="text-[11px] text-slate-500">
+                      {timeAgo(c.createdAt)}
+                    </span>
+                  </div>
+
+                  {String(c.author?._id) === String(userId) && (
+                    <button
+                      onClick={() => deleteComment(c._id)}
+                      className="text-xs text-rose-600 hover:underline"
+                    >
+                      Delete
+                    </button>
+                  )}
                 </div>
-                {String(c.author?._id) === String(userId) && (
-                  <button onClick={() => deleteComment(c._id)} className="opacity-0 group-hover/comm:opacity-100 text-rose-500 transition-opacity p-1">
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                )}
+
+                <div className="mt-1 text-sm text-slate-700">
+                  {renderMentions(c.text, c.mentions)}
+                </div>
               </div>
-            ))}
+            </div>
+          ))}
         </div>
 
-        {/* INPUT: Midnight Control Style */}
-        <div className="flex gap-4 items-end">
-          <div className="flex-1 bg-[#1A1D26] border border-white/10 rounded-2xl px-4 py-1.5 focus-within:border-indigo-500/50 transition-all shadow-inner">
+        {/* COMMENT INPUT */}
+        <div className="flex items-center gap-3">
+          <div className="flex-1 border border-gray-100 rounded-full px-3 py-1.5 bg-white focus-within:ring-1 focus-within:ring-indigo-100">
             <MentionInput
               value={text}
               onChange={setText}
               onMentionsChange={setCommentMentions}
-              placeholder="System log... @user"
-              rows={2}
-              className="py-2 text-sm text-white placeholder:text-slate-600 font-medium"
+              placeholder="Write comment..."
+              rows={1}
             />
           </div>
+
           <button
             onClick={addComment}
-            className="px-8 h-12 rounded-2xl bg-indigo-600 text-white font-black text-xs uppercase tracking-widest hover:bg-indigo-500 transition-all shadow-lg shadow-indigo-600/20 active:scale-95 mb-1"
+            className="text-indigo-600 text-[13px] font-semibold hover:text-indigo-500"
           >
             Post
           </button>
         </div>
       </div>
-
-      {/* FULL-SCREEN MODAL */}
-      {activeImage && (
-        <div
-          className="fixed inset-0 bg-black/95 backdrop-blur-xl flex items-center justify-center z-[100] p-4 animate-in fade-in duration-300"
-          onClick={() => setActiveImage(null)}
-        >
-          <img
-            src={activeImage}
-            className="max-w-full max-h-full rounded-2xl shadow-[0_0_50px_rgba(79,70,229,0.3)] object-contain"
-            alt="Expanded view"
-          />
-        </div>
-      )}
-    </div>
+    </article>
   );
 };
 

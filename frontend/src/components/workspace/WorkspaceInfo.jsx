@@ -1,7 +1,14 @@
 import WorkspaceMembers from "./WorkspaceMembers";
 import InviteMember from "./InviteMember";
 import ChannelManager from "./ChannelManager";
-import { ChevronLeft, ShieldCheck, UserCircle, LayoutGrid, Info, Zap } from "lucide-react";
+import {
+  ChevronLeft,
+  ShieldCheck,
+  UserCircle,
+  LayoutGrid,
+  Info,
+  Zap
+} from "lucide-react";
 
 const WorkspaceInfo = ({ workspace, onClose, onChannelCreated }) => {
   const token = localStorage.getItem("token");
@@ -17,79 +24,85 @@ const WorkspaceInfo = ({ workspace, onClose, onChannelCreated }) => {
   const isAdmin = myRole === "admin";
 
   return (
-    <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex justify-end z-[80] animate-in fade-in duration-300">
-      
-      {/* PANEL CONTAINER: Deep Onyx for Maximum Contrast */}
-      <div className="w-full sm:w-[460px] bg-[#07080B] h-full shadow-[0_0_50px_rgba(0,0,0,0.5)] border-l border-white/10 flex flex-col overflow-hidden animate-in slide-in-from-right duration-500">
-        
-        {/* TOP NAVIGATION BAR: Solid & Sharp */}
-        <div className="px-6 py-5 flex items-center justify-between border-b border-white/10 bg-[#11141D] z-10">
+    <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex justify-end z-[80]">
+
+      {/* PANEL */}
+      <div className="w-full sm:w-[460px] bg-white h-full shadow-2xl border-l border-slate-200 flex flex-col overflow-hidden">
+
+        {/* HEADER */}
+        <div className="px-6 py-5 flex items-center justify-between border-b border-slate-200 bg-white">
           <button
             onClick={onClose}
-            className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.2em] text-slate-300 hover:text-white transition-all group"
+            className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-slate-500 hover:text-slate-900 transition"
           >
-            <ChevronLeft className="w-5 h-5 text-indigo-500 group-hover:-translate-x-1 transition-transform" />
+            <ChevronLeft className="w-4 h-4" />
             Back
           </button>
-          
-          <div className="flex items-center gap-2 bg-indigo-600 px-3 py-1.5 rounded-lg shadow-lg shadow-indigo-600/20">
-            <ShieldCheck className="w-4 h-4 text-white" />
-            <span className="text-[10px] font-black text-white uppercase tracking-widest">
-              {myRole || "Member"} Access
+
+          <div className="flex items-center gap-2 bg-indigo-50 border border-indigo-200 px-3 py-1 rounded-lg">
+            <ShieldCheck className="w-4 h-4 text-indigo-600" />
+            <span className="text-[10px] font-bold text-indigo-600 uppercase tracking-widest">
+              {myRole || "Member"}
             </span>
           </div>
         </div>
 
-        {/* SCROLLABLE CONTENT AREA */}
-        <div className="flex-1 overflow-y-auto custom-scrollbar bg-[radial-gradient(circle_at_top_right,_var(--tw-gradient-stops))] from-[#111420] to-[#07080B]">
-          
-          {/* HERO SECTION: Vivid White text on Dark Gradient */}
-          <div className="px-8 py-12 border-b border-white/10">
-            <div className="w-20 h-20 bg-indigo-600 rounded-2xl flex items-center justify-center text-3xl font-black text-white shadow-[0_0_30px_rgba(79,70,229,0.4)] mb-8 transform -rotate-3 hover:rotate-0 transition-transform duration-300">
+        {/* CONTENT */}
+        <div className="flex-1 overflow-y-auto bg-slate-50">
+
+          {/* HERO */}
+          <div className="px-8 py-10 border-b border-slate-200">
+            <div className="w-16 h-16 bg-indigo-600 rounded-xl flex items-center justify-center text-2xl font-bold text-white mb-6 shadow-md">
               {workspace.name.charAt(0).toUpperCase()}
             </div>
-            <h3 className="text-3xl font-black text-white tracking-tighter mb-4">{workspace.name}</h3>
-            
-            <div className="flex items-start gap-3 p-4 bg-white/5 rounded-2xl border border-white/5">
-              <Info className="w-5 h-5 text-indigo-400 mt-0.5 flex-shrink-0" />
-              <p className="text-sm font-medium text-slate-200 leading-relaxed">
-                {workspace.description || "A high-performance workspace designed for elite collaboration and real-time communication."}
+
+            <h3 className="text-2xl font-bold text-slate-900 mb-3">
+              {workspace.name}
+            </h3>
+
+            <div className="flex items-start gap-3 p-4 bg-white rounded-xl border border-slate-200">
+              <Info className="w-5 h-5 text-indigo-500 mt-0.5" />
+              <p className="text-sm text-slate-600">
+                {workspace.description ||
+                  "A collaborative workspace for your team and projects."}
               </p>
             </div>
           </div>
 
-          <div className="p-8 space-y-12">
-            
-            {/* INVITE SECTION (ADMIN ONLY): High Visibility Card */}
+          <div className="p-8 space-y-10">
+
+            {/* INVITE */}
             {(isOwner || isAdmin) && (
-              <section className="space-y-4">
+              <section className="space-y-3">
                 <div className="flex items-center gap-2">
-                  <Zap className="w-4 h-4 text-emerald-400" />
-                  <h4 className="text-[11px] font-black text-slate-400 uppercase tracking-[0.25em]">Growth & Recruitment</h4>
+                  <Zap className="w-4 h-4 text-emerald-500" />
+                  <h4 className="text-xs font-bold text-slate-500 uppercase tracking-widest">
+                    Invite Members
+                  </h4>
                 </div>
-                <div className="bg-[#11141D] border-2 border-white/5 rounded-[24px] p-6 shadow-2xl">
+
+                <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
                   <InviteMember workspaceId={workspace._id} />
-                  <p className="text-[10px] text-slate-500 mt-5 font-bold text-center uppercase tracking-tighter opacity-60">
-                    Security protocol: Admins only
-                  </p>
                 </div>
               </section>
             )}
 
-            {/* MEMBERS LIST SECTION */}
-            <section className="space-y-4 pb-10">
-               <div className="flex items-center justify-between border-b border-white/10 pb-4">
-                  <div className="flex items-center gap-2">
-                    <UserCircle className="w-4 h-4 text-indigo-400" />
-                    <h4 className="text-[11px] font-black text-slate-200 uppercase tracking-widest">
-                      Operator Directory
-                    </h4>
-                  </div>
-                  <span className="text-[10px] font-black text-slate-500 bg-white/5 px-3 py-1 rounded-full uppercase">
-                    {workspace.members.length} Online
-                  </span>
-               </div>
-              <div className="bg-[#0B0D13] rounded-[24px] overflow-hidden border border-white/10 shadow-inner">
+            {/* MEMBERS */}
+            <section className="space-y-3">
+              <div className="flex items-center justify-between border-b border-slate-200 pb-3">
+                <div className="flex items-center gap-2">
+                  <UserCircle className="w-4 h-4 text-indigo-500" />
+                  <h4 className="text-xs font-bold text-slate-600 uppercase tracking-widest">
+                    Members
+                  </h4>
+                </div>
+
+                <span className="text-xs text-slate-500 bg-slate-100 px-3 py-1 rounded-full">
+                  {workspace.members.length}
+                </span>
+              </div>
+
+              <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
                 <WorkspaceMembers
                   workspace={workspace}
                   currentUserId={currentUserId}
@@ -100,30 +113,24 @@ const WorkspaceInfo = ({ workspace, onClose, onChannelCreated }) => {
           </div>
         </div>
 
-        {/* FOOTER: Anchored Administrative Tools */}
+        {/* FOOTER */}
         {(isOwner || isAdmin) && (
-          <div className="mt-auto p-8 bg-[#0F111A] border-t border-white/10 shadow-[0_-10px_30px_rgba(0,0,0,0.3)]">
-            <div className="flex items-center gap-2 mb-6">
-              <LayoutGrid className="w-5 h-5 text-indigo-500" />
-              <h4 className="text-xs font-black text-white uppercase tracking-[0.2em]">Architecture Control</h4>
+          <div className="p-6 border-t border-slate-200 bg-white">
+            <div className="flex items-center gap-2 mb-4">
+              <LayoutGrid className="w-4 h-4 text-indigo-500" />
+              <h4 className="text-xs font-bold text-slate-600 uppercase tracking-widest">
+                Channels
+              </h4>
             </div>
-            <div className="bg-[#1A1D26] p-1 rounded-2xl border border-white/5">
-              <ChannelManager
-                workspaceId={workspace._id}
-                channels={workspace.channels || []}
-                onCreated={onChannelCreated}
-              />
-            </div>
+
+            <ChannelManager
+              workspaceId={workspace._id}
+              channels={workspace.channels || []}
+              onCreated={onChannelCreated}
+            />
           </div>
         )}
       </div>
-
-      <style>{`
-        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
-        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 10px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #4F46E5; }
-      `}</style>
     </div>
   );
 };
