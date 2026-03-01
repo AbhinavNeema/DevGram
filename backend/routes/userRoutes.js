@@ -8,11 +8,12 @@ const {
   getUserProfile,
   updateUserProfile,
   getAllUsers,
-  getUserByUsername
+  getUserByUsername,
+  searchUsers
 } = require("../controllers/userController");
 
 router.get("/", auth, getAllUsers);
-
+router.get("/search", auth, searchUsers);
 router.get("/:id", auth, getUserProfile);
 
 router.put(

@@ -164,3 +164,60 @@ exports.getUserByUsername = async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 };
+
+exports.searchUsers = async (req, res) => {
+  try {
+    const q = req.query.q?.trim();
+
+    if (!q || q.length < 2) {
+      return res.json([]);
+    }
+
+    const currentUserId = req.userId;
+
+    // Escape regex special characters
+    const safeQuery = q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+    // 1️⃣ Prefix match (higher priority)
+    const prefixRegex = new RegExp(`^${safeQuery}`, "i");
+
+    const prefixMatches = await User.find({
+      _id: { $ne: currentUserId },
+      $or: [
+        { username: prefixRegex },
+        { name: prefixRegex }
+      ]
+    })
+      .select("name username bio")
+      .limit(6)
+      .lean();
+
+    // 2️⃣ Partial match (fallback)
+    const partialRegex = new RegExp(safeQuery, "i");
+
+    const partialMatches = await User.find({
+      _id: { $ne: currentUserId },
+      $or: [
+        { username: partialRegex },
+        { name: partialRegex }
+      ]
+    })
+      .select("name username bio")
+      .limit(10)
+      .lean();
+
+    // 3️⃣ Remove duplicates (prefix first)
+    const combined = [
+      ...prefixMatches,
+      ...partialMatches.filter(
+        p => !prefixMatches.find(x => x._id.toString() === p._id.toString())
+      )
+    ];
+
+    res.json(combined.slice(0, 10));
+
+  } catch (err) {
+    console.error("User Search Error:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+};

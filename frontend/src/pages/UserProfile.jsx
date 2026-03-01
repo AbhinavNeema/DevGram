@@ -211,12 +211,8 @@ const UserProfile = () => {
                     Edit Profile
                   </button>
 
-                  <button
-                    onClick={() => navigate("/settings")}
-                    className="p-3 rounded-xl bg-gray-100 hover:bg-gray-200 border border-gray-200"
-                  >
-                    <Settings size={18}/>
-                  </button>
+                  
+                    
                 </>
               )}
 

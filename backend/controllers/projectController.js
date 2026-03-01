@@ -360,31 +360,72 @@ exports.getProjectById = async (req, res) => {
 exports.getTrendingProjects = async (req, res) => {
   try {
     const userId = req.userId;
+    const productionMode = process.env.FEED_SEEN_MODE === "true";
 
-    const projects = await Project.find({
-      seenBy: { $ne: userId }
-    })
-      .sort({
-        views: -1,
-        likes: -1,
-        createdAt: -1
-      })
-      .limit(10)
+    let filter = {};
+
+    if (productionMode) {
+      filter.seenBy = { $ne: userId };
+    }
+
+    const RECENT_LIMIT = 500;
+
+    const projects = await Project.find(filter)
+      .sort({ createdAt: -1 }) // recent pool first
+      .limit(RECENT_LIMIT)
+      .select("title description owner createdAt likes views comments embedding")
       .populate("owner", "name username")
-      .populate("comments.author", "name username");
+      .lean();
 
-    if (projects.length === 0) {
+    if (!projects.length) {
       return res.json([]);
     }
 
-    const projectIds = projects.map(p => p._id);
+    const scoreProject = (project) => {
+      const likes = project.likes?.length || 0;
+      const comments = project.comments?.length || 0;
+      const views = project.views || 0;
 
-    await Project.updateMany(
-      { _id: { $in: projectIds } },
-      { $addToSet: { seenBy: userId } }
-    );
+      // Engagement (weighted)
+      const engagementScore =
+        likes * 2 +
+        comments * 3 +
+        views * 0.2;
 
-    res.json(projects);
+      // Recency decay (half-life ~48h)
+      const ageHours =
+        (Date.now() - new Date(project.createdAt)) /
+        (1000 * 60 * 60);
+
+      const recencyScore = Math.exp(-ageHours / 48);
+
+      // Final trending score
+      return (
+        0.7 * engagementScore +
+        0.3 * recencyScore
+      );
+    };
+
+    const ranked = projects
+      .map(p => ({
+        ...p,
+        score: scoreProject(p),
+      }))
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 10);
+
+    // Mark as seen only in production
+    if (productionMode && ranked.length > 0) {
+      const projectIds = ranked.map(p => p._id);
+
+      await Project.updateMany(
+        { _id: { $in: projectIds } },
+        { $addToSet: { seenBy: userId } }
+      );
+    }
+
+    res.json(ranked);
+
   } catch (error) {
     console.error("Trending Error:", error);
     res.status(500).json({ message: "Server error" });

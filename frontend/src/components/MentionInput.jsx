@@ -17,27 +17,30 @@ const MentionInput = ({
 
   /* 🔹 Debounced fetch for suggestions (lightweight) 🔹 */
   useEffect(() => {
-    if (!query) {
+  if (!query) {
+    setSuggestions([]);
+    return;
+  }
+
+  if (debounceRef.current) clearTimeout(debounceRef.current);
+
+  debounceRef.current = setTimeout(async () => {
+    try {
+      const res = await api.get(
+        `/users/search?q=${encodeURIComponent(query)}`
+      );
+
+      setSuggestions(Array.isArray(res.data) ? res.data : []);
+    } catch (err) {
+      console.error("Mention search failed", err);
       setSuggestions([]);
-      return;
     }
+  }, 220);
 
-    // debounce
+  return () => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(async () => {
-      try {
-        const res = await api.get(`/search?q=${encodeURIComponent(query)}`);
-        setSuggestions(res.data.users || []);
-      } catch (err) {
-        console.error("Mention search failed", err);
-        setSuggestions([]);
-      }
-    }, 220);
-
-    return () => {
-      if (debounceRef.current) clearTimeout(debounceRef.current);
-    };
-  }, [query]);
+  };
+}, [query]);
 
   useEffect(() => {
     const handleClickOutside = (e) => {
@@ -81,14 +84,14 @@ const MentionInput = ({
   return (
     <div ref={boxRef} className="relative w-full group">
       {/* compact single-line textarea container (light theme) */}
-      <div className="relative overflow-hidden rounded-full border border-gray-200 bg-white transition-all duration-150 focus-within:ring-1 focus-within:ring-indigo-100">
+      <div className="relative overflow-hidden rounded-lg border border-gray-200 bg-white transition-all duration-150 focus-within:ring-1 focus-within:ring-indigo-100">
         <textarea
           ref={ref}
           value={value}
           rows={rows}
           onChange={handleChange}
           placeholder={placeholder}
-          className="w-full bg-transparent px-3 py-1 text-sm text-slate-800 placeholder:text-slate-400 outline-none transition-all resize-none font-medium leading-tight"
+          className="w-full bg-transparent px-3 py-2 text-sm text-slate-800 placeholder:text-slate-400 outline-none transition-all resize-none font-medium leading-tight"
         />
 
         {/* subtle at-sign indicator */}

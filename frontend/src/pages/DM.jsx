@@ -26,7 +26,7 @@ const DM = () => {
   
   const token = localStorage.getItem("token");
   const payload = token ? JSON.parse(atob(token.split(".")[1])) : null;
-  const currentUserId = payload?.id || payload?.sub || null;
+  const currentUserId = payload?.sub || payload?.id || null;
 
   const [inbox, setInbox] = useState([]);
   const [activeConversation, setActiveConversation] = useState(null);
@@ -55,6 +55,13 @@ const DM = () => {
     socket.emit("joinConversation", conversationId);
     api.get(`/messages/${conversationId}`).then(res => {
       setMessages(res.data);
+      setInbox(prev =>
+        prev.map(c =>
+          c._id === conversationId
+            ? { ...c, unreadCount: 0 }
+            : c
+        )
+      );
       scrollToBottom();
     });
     api.put(`/messages/read/${conversationId}`);
@@ -174,14 +181,18 @@ const DM = () => {
   };
 
   const startEditMessage = (msg) => {
-  
-  if (msg.type === "image") return;
+    if (!msg) return;
+    if (msg.type === "image") return;
+    if (!msg._id || String(msg._id).startsWith("c-")) return;
+    if (String(msg.sender?._id) !== String(currentUserId)) return;
 
-  if (!msg._id || String(msg._id).startsWith("c-")) return;
+    setEditingMessageId(msg._id);
+    setEditingText(msg.content || "");
 
-  setEditingMessageId(msg._id);
-  setEditingText(msg.content || "");
-};
+    setTimeout(() => {
+      editInputRef.current?.focus();
+    }, 0);
+  };
 
   const saveEdit = async (msgId) => {
     if (!editingText.trim()) return;
@@ -193,339 +204,351 @@ const DM = () => {
   };
 
   const deleteMessage = async id => {
-  try {
-    await api.delete(`/messages/message/${id}`);
-    setMessages(prev => prev.filter(m => m._id !== id));
-  } catch {
-    toast.error("Delete failed");
-  }
-};
+    try {
+      await api.delete(`/messages/message/${id}`);
+      setMessages(prev => prev.filter(m => m._id !== id));
+    } catch {
+      toast.error("Delete failed");
+    }
+  };
 
   const otherUser = activeConversation?.participants?.find(p => p._id !== currentUserId);
   const timeShort = (iso) => iso ? new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "";
 
   return (
-<div className="h-[calc(100vh-100px)] flex bg-gray-50 overflow-hidden rounded-3xl border border-gray-200 shadow-sm">
+    <div className="h-[calc(100vh-100px)] flex bg-gray-50 overflow-hidden rounded-3xl border border-gray-200 shadow-sm">
 
-{/* INBOX SIDEBAR */}
-<div className={`${conversationId ? "hidden md:flex" : "flex"} w-full md:w-[380px] flex-col bg-white border-r border-gray-200`}>
+      {/* INBOX SIDEBAR */}
+      <div className={`${conversationId ? "hidden md:flex" : "flex"} w-full md:w-[380px] flex-col bg-white border-r border-gray-200`}>
 
-<div className="p-6 border-b border-gray-200">
-<h2 className="text-lg font-semibold text-slate-900 mb-4">Inbox</h2>
+        <div className="p-6 border-b border-gray-200">
+          <h2 className="text-lg font-semibold text-slate-900 mb-4">Inbox</h2>
 
-<div className="relative">
-<Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400"/>
-<input
-placeholder="Search..."
-className="w-full bg-white border border-gray-200 rounded-xl py-2.5 pl-10 pr-4 text-sm text-slate-700 focus:outline-none focus:ring-1 focus:ring-indigo-300"
-/>
-</div>
-</div>
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400"/>
+            <input
+              placeholder="Search..."
+              className="w-full bg-white border border-gray-200 rounded-xl py-2.5 pl-10 pr-4 text-sm text-slate-700 focus:outline-none focus:ring-1 focus:ring-indigo-300"
+            />
+          </div>
+        </div>
 
-<div className="flex-1 overflow-y-auto custom-scrollbar">
+        <div className="flex-1 overflow-y-auto custom-scrollbar">
 
-{inbox.length === 0 ? (
-<div className="flex flex-col items-center justify-center h-40 text-gray-400">
-<MessageSquare className="w-8 h-8 mb-2"/>
-<p className="text-sm">No Messages</p>
-</div>
-) : (
+          {inbox.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-40 text-gray-400">
+              <MessageSquare className="w-8 h-8 mb-2"/>
+              <p className="text-sm">No Messages</p>
+            </div>
+          ) : (
 
-inbox.map(conv => {
+            inbox.map(conv => {
 
-const other = conv.participants.find(
-p => String(p._id) !== String(currentUserId)
-);
+              const other = conv.participants.find(
+                p => String(p._id) !== String(currentUserId)
+              );
 
-const active = conversationId === conv._id;
+              const active = conversationId === conv._id;
 
-return (
+              return (
 
-<div
-key={conv._id}
-onClick={() => navigate(`/dm/${conv._id}`)}
-className={`flex items-center gap-4 p-4 cursor-pointer ${
-active ? "bg-indigo-50" : "hover:bg-gray-50"
-}`}
->
+                <div
+                  key={conv._id}
+                  onClick={() => navigate(`/dm/${conv._id}`)}
+                  className={`flex items-center gap-4 p-4 cursor-pointer ${
+                    active ? "bg-indigo-50" : "hover:bg-gray-50"
+                  }`}
+                >
 
-<div className="w-11 h-11 rounded-xl bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold">
-{other?.name?.[0]}
-</div>
+                  <div className="w-11 h-11 rounded-xl bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold">
+                    {other?.name?.[0]}
+                  </div>
 
-<div className="flex-1 min-w-0">
+                  <div className="flex-1 min-w-0">
 
-<div className="flex justify-between mb-1">
+                    <div className="flex justify-between mb-1">
 
-<span className="text-sm font-semibold text-slate-900 truncate">
-{other?.name}
-</span>
+                      <span className="text-sm font-semibold text-slate-900 truncate">
+                        {other?.name}
+                      </span>
 
-<span className="text-xs text-gray-400">
-{conv.lastMessage?.createdAt
-? timeShort(conv.lastMessage.createdAt)
-: ""}
-</span>
+                      <span className="text-xs text-gray-400">
+                        {conv.lastMessage?.createdAt
+                          ? timeShort(conv.lastMessage.createdAt)
+                          : ""}
+                      </span>
 
-</div>
+                    </div>
 
-<p className="text-xs text-gray-500 truncate">
-{conv.lastMessage?.content || "..."}
-</p>
+                    <p
+                      className={`text-xs truncate ${
+                        (conv.unreadCount || 0) > 0
+                          ? "text-slate-900 font-semibold"
+                          : "text-gray-500"
+                      }`}
+                    >
+                      {conv.lastMessage?.content || "..."}
+                    </p>
 
-</div>
+                  </div>
 
-{(conv.unreadCount || 0) > 0 && (
-<div className="bg-indigo-600 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center">
-{conv.unreadCount}
-</div>
-)}
+                  {(conv.unreadCount || 0) > 0 && (
+                    <div className="flex flex-col items-end gap-1">
+                      <div className="bg-indigo-600 text-white text-[10px] px-2 py-0.5 rounded-full">
+                        {conv.unreadCount} new
+                      </div>
+                    </div>
+                  )}
 
-</div>
+                </div>
 
-);
+              );
 
-})
+            })
 
-)}
+          )}
 
-</div>
-</div>
+        </div>
+      </div>
 
 
-{/* CHAT VIEWPORT */}
+      {/* CHAT VIEWPORT */}
 
-<div className={`flex-1 flex flex-col bg-white ${!conversationId && "hidden md:flex items-center justify-center"}`}>
+      <div className={`flex-1 flex flex-col bg-white ${!conversationId && "hidden md:flex items-center justify-center"}`}>
 
-{!conversationId ? (
+        {!conversationId ? (
 
-<div className="text-center p-12">
+          <div className="text-center p-12">
 
-<MessageSquare className="w-14 h-14 text-gray-300 mx-auto mb-4"/>
+            <MessageSquare className="w-14 h-14 text-gray-300 mx-auto mb-4"/>
 
-<h2 className="text-xl font-semibold text-slate-900">
-Select a conversation
-</h2>
+            <h2 className="text-xl font-semibold text-slate-900">
+              Select a conversation
+            </h2>
 
-</div>
+          </div>
 
-) : (
+        ) : (
 
-<>
+          <>
 
-{/* HEADER */}
+            {/* HEADER */}
 
-<div className="px-6 py-4 flex items-center justify-between border-b border-gray-200">
+            <div className="px-6 py-4 flex items-center justify-between border-b border-gray-200">
 
-<div className="flex items-center gap-3">
+              <div className="flex items-center gap-3">
 
-<button
-onClick={() => navigate("/dm")}
-className="md:hidden text-gray-500"
->
-<ChevronLeft/>
-</button>
+                <button
+                  onClick={() => navigate("/dm")}
+                  className="md:hidden text-gray-500"
+                >
+                  <ChevronLeft/>
+                </button>
 
-<div className="w-10 h-10 rounded-lg bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold">
-{otherUser?.name?.[0]}
-</div>
+                <div className="w-10 h-10 rounded-lg bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold">
+                  {otherUser?.name?.[0]}
+                </div>
 
-<div>
+                <div>
 
-<h3 className="text-sm font-semibold text-slate-900">
-{otherUser?.name}
-</h3>
+                  <h3 className="text-sm font-semibold text-slate-900">
+                    {otherUser?.name}
+                  </h3>
 
-<span className="text-xs text-green-500">
-Active
-</span>
+                  <span className="text-xs text-green-500">
+                    Active
+                  </span>
 
-</div>
+                </div>
 
-</div>
+              </div>
 
-<MoreVertical className="text-gray-400"/>
+              <MoreVertical className="text-gray-400"/>
 
-</div>
+            </div>
 
 
-{/* MESSAGES */}
+            {/* MESSAGES */}
 
-<div className="flex-1 overflow-y-auto p-6 space-y-5 custom-scrollbar">
+            <div className="flex-1 overflow-y-auto p-6 space-y-5 custom-scrollbar">
 
-{messages.map(msg => {
+              {messages.map(msg => {
 
-const mine = msg.sender?._id === currentUserId;
+                const mine = msg.sender?._id === currentUserId;
 
-return (
+                return (
 
-<div
-key={msg._id}
-className={`flex ${mine ? "justify-end" : "justify-start"}`}
->
+                  <div
+                    key={msg._id}
+                    className={`flex ${mine ? "justify-end" : "justify-start"}`}
+                  >
 
-<div
-className={`max-w-[70%] px-4 py-2 rounded-xl text-sm ${
-mine
-? "bg-indigo-600 text-white"
-: "bg-gray-100 text-slate-800"
-}`}
->
+                    <div
+                      className={`max-w-[70%] px-4 py-2 rounded-xl text-sm ${
+                        mine
+                          ? "bg-indigo-600 text-white"
+                          : "bg-gray-100 text-slate-800"
+                      }`}
+                    >
 
-{msg.type === "image" ? (
+                      {msg.type === "image" ? (
 
-<img
-src={
-msg.content.startsWith("http")
-? msg.content
-: `${import.meta.env.VITE_BACKEND_URL}${msg.content}`
-}
-alt="sent"
-className="rounded-lg"
-/>
+                        <img
+                          src={
+                            msg.content.startsWith("http")
+                              ? msg.content
+                              : `${import.meta.env.VITE_BACKEND_URL}${msg.content}`
+                          }
+                          alt="sent"
+                          className="rounded-lg"
+                        />
 
-) : editingMessageId === msg._id ? (
+                      ) : editingMessageId === msg._id ? (
 
-<div>
+                        <div>
 
-<input
-ref={editInputRef}
-value={editingText}
-onChange={e => setEditingText(e.target.value)}
-className="border border-gray-300 rounded px-2 py-1 text-sm"
-/>
+                          <input
+                            ref={editInputRef}
+                            value={editingText}
+                            onChange={e => setEditingText(e.target.value)}
+                            className={`w-full px-2 py-1 text-sm rounded-md outline-none border ${
+                              mine
+                                ? "bg-white text-slate-900 border-white"
+                                : "bg-white text-slate-900 border-gray-300"
+                            }`}
+                          />
 
-<div className="flex gap-2 mt-2">
+                          <div className="flex gap-2 mt-2">
 
-<button
-onClick={() => saveEdit(msg._id)}
-className="text-green-600 text-xs"
->
-<Check size={14}/>
-</button>
+                            <button
+                              onClick={() => saveEdit(msg._id)}
+                              className="text-green-600 text-xs"
+                            >
+                              <Check size={14}/>
+                            </button>
 
-<button
-onClick={() => setEditingMessageId(null)}
-className="text-red-500 text-xs"
->
-<X size={14}/>
-</button>
+                            <button
+                              onClick={() => setEditingMessageId(null)}
+                              className="text-red-500 text-xs"
+                            >
+                              <X size={14}/>
+                            </button>
 
-</div>
+                          </div>
 
-</div>
+                        </div>
 
-) : (
+                      ) : (
 
-<p>{msg.content}</p>
+                        <p>{msg.content}</p>
 
-)}
+                      )}
 
-<div className="text-[10px] opacity-70 mt-1">
-{timeShort(msg.createdAt)}
-</div>
+                      <div className="text-[10px] opacity-70 mt-1">
+                        {timeShort(msg.createdAt)}
+                      </div>
 
-{mine && !editingMessageId && (
+                      {mine && !editingMessageId && (
 
-<div className="flex gap-3 mt-1 text-[10px]">
+                        <div className="flex gap-3 mt-1 text-[10px]">
 
-{msg.type !== "image" && (
+                          {msg.type !== "image" && (
 
-<button
-onClick={() => startEditMessage(msg)}
-className="text-indigo-500"
->
-Edit
-</button>
+                            <button
+                              onClick={() => startEditMessage(msg)}
+                              className="text-indigo-500"
+                            >
+                              Edit
+                            </button>
 
-)}
+                          )}
 
-<button
-onClick={() => deleteMessage(msg._id)}
-className="text-red-500"
->
-Delete
-</button>
+                          <button
+                            onClick={() => deleteMessage(msg._id)}
+                            className="text-red-500"
+                          >
+                            Delete
+                          </button>
 
-</div>
+                        </div>
 
-)}
+                      )}
 
-</div>
+                    </div>
 
-</div>
+                  </div>
 
-);
+                );
 
-})}
+              })}
 
-<div ref={messagesEndRef}/>
+              <div ref={messagesEndRef}/>
 
-</div>
+            </div>
 
 
-{/* INPUT */}
+            {/* INPUT */}
 
-<div className="p-4 border-t border-gray-200">
+            <div className="p-4 border-t border-gray-200">
 
-<div className="flex items-center gap-3 border border-gray-200 rounded-xl p-2">
+              <div className="flex items-center gap-3 border border-gray-200 rounded-xl p-2">
 
-<input
-type="file"
-accept="image/*"
-ref={fileInputRef}
-hidden
-onChange={sendImage}
-/>
+                <input
+                  type="file"
+                  accept="image/*"
+                  ref={fileInputRef}
+                  hidden
+                  onChange={sendImage}
+                />
 
-<button onClick={() => fileInputRef.current.click()}>
-<ImageIcon className="w-5 h-5 text-gray-500"/>
-</button>
+                <button onClick={() => fileInputRef.current.click()}>
+                  <ImageIcon className="w-5 h-5 text-gray-500"/>
+                </button>
 
-<textarea
-ref={sendInputRef}
-value={text}
-onChange={e => setText(e.target.value)}
-onKeyDown={e => {
-if (e.key === "Enter" && !e.shiftKey) {
-e.preventDefault();
-sendMessage();
-}
-}}
-placeholder="Write a message..."
-rows={1}
-className="flex-1 resize-none outline-none text-sm"
-/>
+                <textarea
+                  ref={sendInputRef}
+                  value={text}
+                  onChange={e => setText(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      sendMessage();
+                    }
+                  }}
+                  placeholder="Write a message..."
+                  rows={1}
+                  className="flex-1 resize-none outline-none text-sm"
+                />
 
-<button
-onClick={sendMessage}
-disabled={!text.trim()}
-className="bg-indigo-600 text-white p-2 rounded-lg disabled:opacity-30"
->
-<Send className="w-4 h-4"/>
-</button>
+                <button
+                  onClick={sendMessage}
+                  disabled={!text.trim()}
+                  className="bg-indigo-600 text-white p-2 rounded-lg disabled:opacity-30"
+                >
+                  <Send className="w-4 h-4"/>
+                </button>
 
-</div>
+              </div>
 
-</div>
+            </div>
 
-</>
+          </>
 
-)}
+        )}
 
-</div>
+      </div>
 
-<style>{`
-.custom-scrollbar::-webkit-scrollbar {
-width:4px;
-}
-.custom-scrollbar::-webkit-scrollbar-thumb {
-background:#cbd5f5;
-}
-`}</style>
+      <style>{`
+        .custom-scrollbar::-webkit-scrollbar {
+          width:4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+          background:#cbd5f5;
+        }
+      `}</style>
 
-</div>
-);
+    </div>
+  );
 };
 
 export default DM;
