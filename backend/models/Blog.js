@@ -26,7 +26,12 @@ const blogSchema = new mongoose.Schema(
       },
     ],
     views: { type: Number, default: 0 },
-
+    seenBy:[
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+      },
+    ],
     viewedBy: [
       {
         user: { type: mongoose.Schema.Types.ObjectId, ref: "User" },

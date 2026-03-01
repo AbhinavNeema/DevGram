@@ -314,7 +314,7 @@ exports.addView = async (req, res) => {
       const updatedEmbedding = updateUserEmbedding(
         user.embedding,
         project.embedding,
-        0.5 // view weight
+        0.5 
       );
       user.embedding = updatedEmbedding;
       await user.save();
@@ -379,42 +379,92 @@ exports.getTrendingProjects = async (req, res) => {
 };
 exports.getPersonalizedFeed = async (req, res) => {
   try {
-    const userId = req.userId;
+    const user = await User.findById(req.userId).lean();
+    if (!user) return res.status(404).json({ message: "User not found" });
 
-    let projects = await Project.find({
-      seenBy: { $ne: userId }
-    })
+    const userEmbedding = user.embedding || [];
+    const followingIds = (user.following || []).map(id => id.toString());
+
+    const limit = Number(req.query.limit || 20);
+    const cursor = Number(req.query.cursor || 0);
+
+    // Retrieve recent candidate pool (scalable later)
+    const RECENT_LIMIT = 500;
+
+    const projects = await Project.find({})
       .sort({ createdAt: -1 })
-      .limit(20)
-      .populate("owner", "name username");
+      .limit(RECENT_LIMIT)
+      .select("title description techStack owner createdAt likes views comments embedding")
+      .populate("owner", "name username")
+      .lean();
 
-    let fallback = false;
+    const scoreProject = (project) => {
+      // 1️⃣ Semantic similarity
+      const similarity = updateUserEmbedding
+        ? require("../utils/vector").cosineSimilarity(userEmbedding, project.embedding || [])
+        : 0;
 
-    if (projects.length === 0) {
-      fallback = true;
+      // 2️⃣ Recency decay (half-life ~3 days)
+      const ageHours =
+        (Date.now() - new Date(project.createdAt)) / (1000 * 60 * 60);
+      const recencyScore = Math.exp(-ageHours / 72);
 
-      projects = await Project.find({
-        seenBy: { $ne: userId }
-      })
-        .sort({ views: -1, likes: -1 })
-        .limit(10)
-        .populate("owner", "name username");
-    }
+      // 3️⃣ Engagement score
+      const likes = project.likes?.length || 0;
+      const comments = project.comments?.length || 0;
+      const views = project.views || 0;
+      const engagementScore = likes * 2 + comments * 3 + views * 0.2;
 
-    if (projects.length === 0) {
-      return res.json([]);
-    }
+      // 4️⃣ Follow boost
+      const followBoost = followingIds.includes(
+        project.owner?._id?.toString()
+      )
+        ? 5
+        : 0;
 
-    const projectIds = projects.map(p => p._id);
+      // Final weighted score
+      return (
+        0.6 * similarity +
+        0.15 * recencyScore +
+        0.15 * engagementScore +
+        0.1 * followBoost
+      );
+    };
 
-    await Project.updateMany(
-      { _id: { $in: projectIds } },
-      { $addToSet: { seenBy: userId } }
+    let ranked = projects
+      .map((p) => ({
+        ...p,
+        feedType: "project",
+        score: scoreProject(p),
+      }))
+      .sort((a, b) => b.score - a.score);
+
+    // Diversity injection: mix in some trending if too similar
+    const trending = [...ranked]
+      .sort((a, b) =>
+        (b.likes?.length || 0) + (b.views || 0) -
+        ((a.likes?.length || 0) + (a.views || 0))
+      )
+      .slice(0, 5);
+
+    const topPersonalized = ranked.slice(0, 15);
+
+    const mixedFeed = [...topPersonalized, ...trending];
+
+    // Remove duplicates
+    const uniqueFeed = Array.from(
+      new Map(mixedFeed.map((item) => [item._id.toString(), item])).values()
     );
 
-    res.json(projects);
+    const paginated = uniqueFeed.slice(cursor, cursor + limit);
+
+    res.json({
+      cursor: cursor + limit,
+      hasMore: cursor + limit < uniqueFeed.length,
+      data: paginated,
+    });
   } catch (err) {
-    console.error("Feed Error:", err);
+    console.error("Elite Feed Error:", err);
     res.status(500).json({ message: "Server error" });
   }
 };
