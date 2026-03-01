@@ -1,197 +1,324 @@
 # DevGram
 
-> **DevGram** — a developer-first social & collaboration platform for sharing projects, authoring technical blogs, and collaborating in real time.
+DevGram is a **developer-first social and collaboration platform** where developers can share projects, publish technical blogs, collaborate in real time, and discover new developers and technologies.
+
+It combines **developer portfolios, social networking, and team collaboration tools** into a single platform built specifically for developers.
 
 ---
 
-## 🎯 Why DevGram
+# Overview
 
-DevGram brings together three workflows developers use every day:
+Developers usually use multiple platforms:
 
-* **Project-centric sharing** — showcase code, demos and deploy links.
-* **Long-form technical content** — publish blogs and knowledge articles.
-* **Team collaboration** — fast DMs and Slack-like workspaces with channels.
+- GitHub for code hosting
+- Medium / Dev.to for blogging
+- Discord / Slack for collaboration
+- LinkedIn / Twitter for sharing work
 
-Designed for modern teams and open-source creators, DevGram pairs a familiar GitHub-style project model with a discovery feed and production-ready real-time chat.
+DevGram brings these workflows together into **one unified ecosystem**.
 
----
+Developers can:
 
-## ✨ Highlights
-
-* JWT-based authentication and username routing
-* Unified feed (projects + blogs) with tag & text search
-* Socket.io real-time chats for DMs and workspace channels
-* Cloudinary-backed image and file uploads with inline previews
-* Role-based workspace permissions and message persistence
-* Production-ready architecture notes for scaling and security
-
----
-
-## 🧩 Tech Stack
-
-**Frontend**
-
-* React (Vite), React Router, Tailwind CSS
-* Axios, Socket.io client, Lucide icons
-
-**Backend**
-
-* Node.js, Express, Mongoose (MongoDB)
-* Socket.io for real-time events
-* JWT auth, Cloudinary integration
-
-**Infrastructure**
-
-* MongoDB Atlas, Cloudinary
-* Deployable to Vercel / Netlify (frontend) and Render / Railway (backend)
+- Share projects
+- Publish technical blogs
+- Discover developers
+- Collaborate via messaging
+- Work together in shared workspaces
+- Explore a personalized developer feed
 
 ---
 
-## 📁 Suggested Repository Layout
+# Features
+
+## Developer Profiles
+
+Each user has a public developer profile containing:
+
+- Profile photo and bio
+- Skills and interests
+- Projects and blogs
+- Followers and following
+
+This allows developers to maintain a **public developer portfolio**.
+
+---
+
+## Project Sharing
+
+Developers can showcase their projects with:
+
+- Project title and description
+- Technology stack tags
+- GitHub repository links
+- Live demo links
+- Screenshots or media uploads
+- Engagement metrics
+
+---
+
+## Technical Blogging
+
+DevGram supports **long-form technical blogs** where developers can share:
+
+- Tutorials
+- System design explanations
+- Engineering insights
+- Development experiences
+
+Blogs support tagging, comments, and engagement metrics.
+
+---
+
+## Social Interactions
+
+Users can:
+
+- Follow other developers
+- Like posts
+- Comment on blogs and projects
+- Discover content via tags
+
+This enables networking and community engagement.
+
+---
+
+# Workspaces & Collaboration
+
+DevGram includes **Workspaces**, collaborative environments where teams can organize and communicate.
+
+Workspaces allow developers to:
+
+- Collaborate in teams
+- Organize discussions
+- Manage members
+- Share updates on projects
+
+---
+
+## Role-Based Access Control (RBAC)
+
+Workspaces use role-based permissions.
+
+### Owner
+- Full control of the workspace
+- Manage roles
+- Delete workspace
+
+### Admin
+- Manage members
+- Create channels
+- Moderate conversations
+
+### Member
+- Participate in discussions
+- Send messages
+- Access shared resources
+
+---
+
+# Real-Time Messaging
+
+DevGram provides **real-time communication using Socket.io**.
+
+Features include:
+
+- Direct messages
+- Workspace channel messaging
+- Message editing and deletion
+- Persistent chat history
+- Online presence indicators
+
+---
+
+# Personalized Feed & Recommendation System
+
+DevGram uses a **custom feed ranking system** to deliver relevant content.
+
+The feed combines multiple signals:
+
+- Content similarity
+- Recency decay
+- Engagement scoring
+- Follow prioritization
+- Trending posts
+- Exploration posts
+
+---
+
+## Feed Characteristics
+
+- Cursor-based pagination
 
 ```
-/devgram
-├─ backend/
-│  ├─ controllers/
-│  ├─ models/
-│  ├─ routes/
-│  ├─ services/        # socket handlers, cloudinary, mailers
-│  ├─ middlewares/
-│  ├─ utils/
-│  ├─ config/
-│  └─ app.js
-├─ frontend/
-│  ├─ src/
-│  ├─ components/
-│  ├─ pages/
-│  ├─ hooks/
-│  └─ vite.config.js
-├─ docker-compose.yml
-├─ README.md
-└─ CONTRIBUTING.md
+/feed?cursor=0&limit=20
+```
+
+- Infinite scrolling
+- Tag-based filtering
+- Seen-content filtering
+- Guaranteed inclusion of followed users' posts
+
+---
+
+# Tech Stack
+
+## Frontend
+
+- React
+- Vite
+- React Router
+- Tailwind CSS
+- Axios
+- Socket.io Client
+
+---
+
+## Backend
+
+- Node.js
+- Express.js
+- MongoDB
+- Mongoose
+- JWT Authentication
+- Socket.io
+
+---
+
+## Infrastructure
+
+- MongoDB Atlas
+- Cloudinary
+- Vercel (frontend)
+- Render (backend)
+
+---
+
+# Project Structure
+
+```
+DevGram
+│
+├── backend
+│   ├── controllers
+│   ├── models
+│   ├── routes
+│   ├── middleware
+│   ├── socket
+│   ├── utils
+│   ├── config
+│   └── server.js
+│
+├── frontend
+│   ├── src
+|   |   ├── api
+│   │   ├── components
+│   │   ├── pages
+|   |   ├── layouts
+│   │   ├── routes
+│   │   ├── context
+|   |   ├── constants
+│   │   └── utils
+│   │
+│   └── vite.config.js
+│
+└── README.md
 ```
 
 ---
 
-## 🚀 Quickstart (Development)
+# Getting Started
 
-**Prereqs**: Node ≥16, npm/yarn, MongoDB (Atlas or local), Cloudinary account
+## Clone the Repository
 
-1. Clone
-
-```bash
+```
 git clone https://github.com/AbhinavNeema/DevGram.git
 cd DevGram
 ```
 
-2. Install & configure
+---
 
-```bash
-# Backend
-cd backend && npm install
-# Frontend (new terminal)
-cd ../frontend && npm install
+# Install Dependencies
+
+Backend
+
+```
+cd backend
+npm install
 ```
 
-3. Create `backend/.env` with the following keys
+Frontend
 
-```env
+```
+cd frontend
+npm install
+```
+
+---
+
+# Environment Variables
+
+Create a `.env` file inside the backend folder.
+
+```
 PORT=5001
 MONGO_URI=your_mongodb_connection_string
 JWT_SECRET=your_jwt_secret
+
 CLOUDINARY_CLOUD_NAME=your_cloud_name
 CLOUDINARY_API_KEY=your_api_key
 CLOUDINARY_API_SECRET=your_api_secret
+
 FRONTEND_URL=http://localhost:5173
 ```
 
-4. Run
+---
 
-```bash
-# Start backend
-cd backend && npm run dev
-# Start frontend
-cd ../frontend && npm run dev
+# Run Development Servers
+
+Backend
+
+```
+cd backend
+npm run dev
 ```
 
-Open `http://localhost:5173` (frontend) and `http://localhost:5001` (API).
+Frontend
+
+```
+cd frontend
+npm run dev
+```
+
+Frontend runs at:
+
+```
+http://localhost:5173
+```
+
+Backend API runs at:
+
+```
+http://localhost:5001
+```
 
 ---
 
-## 🧭 API Overview (Core Endpoints)
+# Contributing
 
-> Minimal summary — see `backend/routes` for full API contract and request/response examples.
+Contributions are welcome.
 
-* `POST /auth/register` — register a user
-* `POST /auth/login` — authenticate (returns JWT)
-* `GET /users/:username` — public profile
-* `GET /feed` — unified feed (projects + blogs)
-* `POST /projects` — create project (auth required)
-* `POST /blogs` — create blog (auth required)
-* `POST /upload` — file/image upload (Cloudinary)
-* Socket events: `message:new`, `message:edit`, `message:delete`, `presence:update`
+Steps:
+
+1. Fork the repository
+2. Create a feature branch
+3. Commit your changes
+4. Submit a pull request
 
 ---
 
-## 🔒 Production & Security Checklist
+# Author
 
-* Serve over HTTPS (managed TLS)
-* Short-lived JWTs + refresh tokens
-* Input validation & sanitization (prevent NoSQL injection)
-* Use `helmet`, `compression`, and `express-rate-limit`
-* Signed Cloudinary uploads for client-side uploads
-* Secrets via platform-managed stores (avoid repo commits)
-* Socket scaling with Redis adapter for horizontal instances
+**Abhinav Neema**
 
----
-
-## ✅ Deployment Recommendations
-
-* **Frontend**: Deploy static build to Vercel / Netlify
-* **Backend**: Host on Render / Railway / Docker + Kubernetes
-* **DB**: MongoDB Atlas (replica set + backups)
-* **Media**: Cloudinary (CDN)
-* **Sockets**: Redis adapter + sticky sessions behind LB
-
-Provide a `Dockerfile` and `docker-compose.yml` for an easy production-ish snapshot.
-
----
-
-## 🛠 CI / DX suggestions
-
-* Add GitHub Actions for linting, tests, and `npm run build`
-* Add an ESLint + Prettier pre-commit hook (husky) for consistent style
-* Add `SERVER_URL` & `FRONTEND_URL` integration tests in CI
-
----
-
-## 📈 Roadmap & Future Work
-
-* Cursor-based pagination and infinite scroll
-* Saved posts / bookmarks and multi-device notifications
-* Notification center (in-app + email)
-* Full-text search (MongoDB Atlas Search or Elastic)
-* AI-based feed ranking and content recommendations
-
----
-
-## 🤝 Contributing
-
-Contributions are welcome. Please follow this flow:
-
-1. Fork the repo
-2. Create a topic branch: `git checkout -b feat/awesome`
-3. Open a PR with a clear description and linked issue
-
-Please include tests for new functionality and adhere to conventional commits.
-
----
-
-
-## 📬 Contact
-
-**Abhinav Neema**  
-- GitHub: https://github.com/AbhinavNeema  
-- LinkedIn: https://www.linkedin.com/in/abhinav-neema-95a69931a/
-
----
+GitHub  
+https://github.com/AbhinavNeema
