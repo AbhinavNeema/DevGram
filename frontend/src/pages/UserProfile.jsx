@@ -7,6 +7,7 @@ import {
   Share2,
   MessageSquare,
   Settings,
+  Edit3,
   X,
   Cpu,
   Terminal,
@@ -27,7 +28,10 @@ const UserProfile = () => {
 
   let currentUserId = null;
   try {
-    if (token) currentUserId = JSON.parse(atob(token.split(".")[1])).id;
+    if (token) {
+      const payload = JSON.parse(atob(token.split(".")[1]));
+      currentUserId = payload?.id || payload?._id || payload?.sub || null;
+    }
   } catch {}
 
   useEffect(() => {
@@ -85,10 +89,11 @@ const UserProfile = () => {
   }
 
   const { user, projects } = data;
-  const isOwner = String(currentUserId) === String(user._id);
+  const isOwner =
+    currentUserId && String(currentUserId) === String(user._id);
 
   return (
-    <div className="max-w-6xl mx-auto px-4 pb-24 pt-10">
+    <div className="max-w-6xl mx-auto px-4 pb-24 pt-10 bg-gray-50 min-h-screen">
 
       {/* ================= HERO HEADER ================= */}
 
@@ -96,14 +101,24 @@ const UserProfile = () => {
 
         <div className="absolute -top-20 left-1/2 -translate-x-1/2 w-[700px] h-[400px] bg-indigo-600/10 blur-[120px] pointer-events-none" />
 
-        <div className="relative bg-[#0F111A]/90 backdrop-blur-xl border border-white/10 rounded-[40px] p-10 shadow-2xl">
+        <div className="relative bg-white border border-gray-200 rounded-[40px] p-10 shadow-xl">
 
           <div className="flex flex-col md:flex-row items-center md:items-start gap-8">
 
             {/* Avatar */}
 
-            <div className="w-28 h-28 rounded-3xl bg-gradient-to-tr from-indigo-500 to-purple-600 flex items-center justify-center text-4xl font-black text-white shadow-[0_20px_40px_rgba(79,70,229,0.4)]">
-              {user.name?.[0]}
+            <div className="w-28 h-28 rounded-3xl overflow-hidden border border-gray-200 shadow-lg bg-gray-100 flex items-center justify-center">
+              {user.profilePhoto ? (
+                <img
+                  src={user.profilePhoto}
+                  alt={user.name}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <div className="w-full h-full bg-gradient-to-tr from-indigo-500 to-purple-600 flex items-center justify-center text-4xl font-black text-white">
+                  {user.name?.[0]}
+                </div>
+              )}
             </div>
 
             {/* Identity */}
@@ -112,7 +127,7 @@ const UserProfile = () => {
 
               <div className="flex flex-col md:flex-row md:items-center gap-3">
 
-                <h1 className="text-3xl font-black text-white tracking-tight">
+                <h1 className="text-3xl font-black text-gray-900 tracking-tight">
                   {user.name}
                 </h1>
 
@@ -122,7 +137,7 @@ const UserProfile = () => {
 
               </div>
 
-              <p className="text-slate-400 mt-3 max-w-xl text-sm">
+              <p className="text-gray-600 mt-3 max-w-xl text-sm">
                 {user.bio || "Developer building things on DevGram."}
               </p>
 
@@ -131,18 +146,18 @@ const UserProfile = () => {
               <div className="flex justify-center md:justify-start gap-10 mt-6">
 
                 <div className="text-center md:text-left">
-                  <p className="text-white text-xl font-black">{projects.length}</p>
-                  <p className="text-[10px] uppercase tracking-widest text-slate-500">Projects</p>
+                  <p className="text-gray-900 text-xl font-black">{projects.length}</p>
+                  <p className="text-[10px] uppercase tracking-widest text-gray-500">Projects</p>
                 </div>
 
                 <div className="text-center md:text-left">
-                  <p className="text-white text-xl font-black">{user.followers.length}</p>
-                  <p className="text-[10px] uppercase tracking-widest text-slate-500">Followers</p>
+                  <p className="text-gray-900 text-xl font-black">{user.followers.length}</p>
+                  <p className="text-[10px] uppercase tracking-widest text-gray-500">Followers</p>
                 </div>
 
                 <div className="text-center md:text-left">
-                  <p className="text-white text-xl font-black">{user.following.length}</p>
-                  <p className="text-[10px] uppercase tracking-widest text-slate-500">Following</p>
+                  <p className="text-gray-900 text-xl font-black">{user.following.length}</p>
+                  <p className="text-[10px] uppercase tracking-widest text-gray-500">Following</p>
                 </div>
 
               </div>
@@ -159,7 +174,7 @@ const UserProfile = () => {
                   setToast("Profile link copied");
                   setTimeout(() => setToast(""), 2000);
                 }}
-                className="p-3 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 transition"
+                className="p-3 rounded-xl bg-gray-100 hover:bg-gray-200 border border-gray-200 transition"
               >
                 <Share2 size={18}/>
               </button>
@@ -187,12 +202,22 @@ const UserProfile = () => {
               )}
 
               {isOwner && (
-                <button
-                  onClick={() => navigate("/settings")}
-                  className="p-3 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10"
-                >
-                  <Settings size={18}/>
-                </button>
+                <>
+                  <button
+                    onClick={() => navigate(`/edit-profile/${user._id}`)}
+                    className="flex items-center gap-2 px-5 py-3 rounded-xl bg-indigo-600 text-white hover:bg-indigo-500 font-black text-xs uppercase tracking-widest shadow-sm"
+                  >
+                    <Edit3 size={16} />
+                    Edit Profile
+                  </button>
+
+                  <button
+                    onClick={() => navigate("/settings")}
+                    className="p-3 rounded-xl bg-gray-100 hover:bg-gray-200 border border-gray-200"
+                  >
+                    <Settings size={18}/>
+                  </button>
+                </>
               )}
 
             </div>
@@ -213,7 +238,7 @@ const UserProfile = () => {
 
           {/* About */}
 
-          <div className="bg-[#0F111A] border border-white/10 rounded-3xl p-6">
+          <div className="bg-white border border-gray-200 rounded-3xl p-6 shadow-sm">
 
             <div className="flex items-center gap-2 mb-4 text-indigo-400">
               <Terminal size={16}/>
@@ -222,7 +247,7 @@ const UserProfile = () => {
               </span>
             </div>
 
-            <p className="text-slate-400 text-sm leading-relaxed">
+            <p className="text-gray-600 text-sm leading-relaxed">
               {user.about || "No description available."}
             </p>
 
@@ -230,7 +255,7 @@ const UserProfile = () => {
 
           {/* Tech stack */}
 
-          <div className="bg-[#0F111A] border border-white/10 rounded-3xl p-6">
+          <div className="bg-white border border-gray-200 rounded-3xl p-6 shadow-sm">
 
             <div className="flex items-center gap-2 mb-4 text-indigo-400">
               <Cpu size={16}/>
@@ -251,7 +276,7 @@ const UserProfile = () => {
                   </span>
                 ))
               ) : (
-                <span className="text-slate-500 text-sm">
+                <span className="text-gray-500 text-sm">
                   No technologies listed
                 </span>
               )}
@@ -269,7 +294,7 @@ const UserProfile = () => {
 
           {/* Tabs */}
 
-          <div className="flex gap-8 border-b border-white/10 mb-8">
+          <div className="flex gap-8 border-b border-gray-200 mb-8">
 
             {["projects", "blogs"].map(tab => (
               <button
@@ -294,9 +319,9 @@ const UserProfile = () => {
 
             {activeTab === "projects" ? (
               projects.length === 0 ? (
-                <div className="text-center py-20 bg-[#0F111A] border border-white/10 rounded-3xl">
+                <div className="text-center py-20 bg-white border border-gray-200 rounded-3xl">
                   <Rocket className="mx-auto mb-4 opacity-40"/>
-                  <p className="text-slate-500 text-sm">No projects published</p>
+                  <p className="text-gray-500 text-sm">No projects published</p>
                 </div>
               ) : (
                 projects.map(p => (
@@ -305,9 +330,9 @@ const UserProfile = () => {
               )
             ) : (
               blogs.length === 0 ? (
-                <div className="text-center py-20 bg-[#0F111A] border border-white/10 rounded-3xl">
+                <div className="text-center py-20 bg-white border border-gray-200 rounded-3xl">
                   <Terminal className="mx-auto mb-4 opacity-40"/>
-                  <p className="text-slate-500 text-sm">No blogs published</p>
+                  <p className="text-gray-500 text-sm">No blogs published</p>
                 </div>
               ) : (
                 blogs.map(b => (
@@ -326,7 +351,7 @@ const UserProfile = () => {
       {/* Toast */}
 
       {toast && (
-        <div className="fixed bottom-10 left-1/2 -translate-x-1/2 px-6 py-3 bg-[#161925] border border-white/10 rounded-full text-sm text-white shadow-xl">
+        <div className="fixed bottom-10 left-1/2 -translate-x-1/2 px-6 py-3 bg-white border border-gray-200 rounded-full text-sm text-gray-800 shadow-lg">
           {toast}
         </div>
       )}

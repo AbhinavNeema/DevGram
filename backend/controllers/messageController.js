@@ -151,17 +151,25 @@ exports.deleteMessage = async (req, res) => {
   res.json({ success: true });
 };
 
+const mongoose = require("mongoose");
+
 exports.editMessage = async (req, res) => {
   try {
     const { content } = req.body;
+    const messageId = req.params.id;
 
     if (!content || !content.trim()) {
       return res.status(400).json({ message: "Message content required" });
     }
 
+    // ✅ Prevent crash if optimistic clientId is sent
+    if (!mongoose.Types.ObjectId.isValid(messageId)) {
+      return res.status(400).json({ message: "Invalid message id" });
+    }
+
     const msg = await Message.findByIdAndUpdate(
-      req.params.id,
-      { content: content.trim() },   // ✅ FIX
+      messageId,
+      { content: content.trim() },
       { new: true }
     ).populate("sender", "name _id");
 
@@ -169,10 +177,11 @@ exports.editMessage = async (req, res) => {
       return res.status(404).json({ message: "Message not found" });
     }
 
-    // 🔥 realtime update
+    // realtime update
     getIO().to(msg.conversation.toString()).emit("editMessage", msg);
 
     res.json(msg);
+
   } catch (err) {
     console.error("Edit message error:", err);
     res.status(500).json({ message: "Failed to edit message" });

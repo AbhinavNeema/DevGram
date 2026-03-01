@@ -211,143 +211,50 @@ const ProjectsPage = () => {
       `}</style>
     </div>
   ) : (
-    <div className="max-w-[1200px] mx-auto px-4 sm:px-6 pb-20">
-      {/* page header */}
-      <div className="flex flex-col lg:flex-row items-start lg:items-end justify-between gap-6 py-8">
-        <div>
-          <div className="flex items-center gap-3 mb-2">
-            <div className="p-2 bg-indigo-600 rounded-lg shadow-[0_0_15px_rgba(79,70,229,0.35)]">
-              <Terminal className="w-5 h-5 text-white" />
-            </div>
-            <h1 className="text-3xl lg:text-4xl font-extrabold text-slate-900 uppercase italic tracking-tight">
-              Deployments
-            </h1>
-          </div>
-          <p className="text-xs uppercase tracking-wide text-slate-500 flex items-center gap-2">
-            <Zap className="w-3.5 h-3.5 text-indigo-500" />
-            {activeTag ? `Filtering Sector: #${activeTag}` : "Global Community Stream"}
-          </p>
-        </div>
-
-        <div className="flex items-center gap-3 w-full lg:w-auto">
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              // quick search: navigate to /search?q=...
-              const q = new URLSearchParams(Object.fromEntries(new FormData(e.target))).get("q");
-              if (!q || !q.trim()) return;
-              window.location.href = `/search?q=${encodeURIComponent(q)}`;
-            }}
-            className="hidden md:flex items-center relative w-full lg:w-[420px]"
-          >
-            <div className="absolute left-3 inset-y-0 flex items-center pointer-events-none">
-              <svg className="w-4 h-4 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M21 21l-4.35-4.35" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
-            </div>
-            <input name="q" placeholder="Search projects, authors, tags..." className="w-full bg-white border border-gray-100 pl-10 pr-4 py-2 rounded-xl text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-indigo-100 focus:border-indigo-300 transition" />
-            <div className="absolute right-3 text-slate-400 text-[11px]">⌘K</div>
-          </form>
-
-          <button onClick={() => window.location.href = "/create"} className="inline-flex items-center gap-2 bg-gradient-to-r from-indigo-600 to-pink-500 text-white px-4 py-2 rounded-xl text-sm font-bold shadow-sm">
-            <Plus className="w-4 h-4" /> Create
-          </button>
-        </div>
-      </div>
-
+    <div className="max-w-2xl mx-auto">
       {/* layout grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,2fr)_1fr] gap-8">
-        {/* FEED COLUMN */}
-        <main>
-          {loading ? (
-            <div className="space-y-6">
-              {[0, 1, 2, 3].map((i) => <SkeletonItem key={i} idx={i} />)}
+      <main>
+        {loading ? (
+          <div className="space-y-8">
+            {[0, 1, 2, 3].map((i) => <SkeletonItem key={i} idx={i} />)}
+          </div>
+        ) : feed.length === 0 ? (
+          <div className="text-center py-24 bg-white rounded-3xl border border-gray-100">
+            <Layers className="mx-auto w-12 h-12 text-slate-400 mb-4" />
+            <h3 className="text-xl font-extrabold text-slate-900 uppercase tracking-tight">No Signal Detected</h3>
+            <p className="text-sm text-slate-500 mt-2">Try clearing filters or create a new post to kickstart the stream.</p>
+            <div className="mt-6">
+              <button onClick={clearFilter} className="px-5 py-2 bg-indigo-600 text-white rounded-xl">Clear Filters</button>
             </div>
-          ) : feed.length === 0 ? (
-            <div className="text-center py-24 bg-white rounded-3xl border border-gray-100">
-              <Layers className="mx-auto w-12 h-12 text-slate-400 mb-4" />
-              <h3 className="text-xl font-extrabold text-slate-900 uppercase tracking-tight">No Signal Detected</h3>
-              <p className="text-sm text-slate-500 mt-2">Try clearing filters or create a new post to kickstart the stream.</p>
-              <div className="mt-6">
-                <button onClick={clearFilter} className="px-5 py-2 bg-indigo-600 text-white rounded-xl">Clear Filters</button>
-              </div>
-            </div>
-          ) : (
-            <div className="space-y-6">
-              {feed.map((item, idx) => {
-                const isLast = idx === feed.length - 1;
-                return (
-                  <div
-                    key={item._id}
-                    ref={isLast ? lastItemRef : null}
-                    className="animate-in fade-in slide-in-from-bottom-6 duration-500"
-                    style={{ animationDelay: `${(idx % 6) * 40}ms` }}
-                  >
-                    {item.feedType === "project" ? (
-                      <ProjectCard project={item} showOwnerActions />
-                    ) : (
-                      <BlogCard blog={item} showOwnerActions />
-                    )}
-                  </div>
-                );
-              })}
-
-              {loadingMore && (
-                <div className="flex justify-center py-6">
-                  <Loader2 className="w-6 h-6 text-indigo-500 animate-spin" />
+          </div>
+        ) : (
+          <div className="space-y-8">
+            {feed.map((item, idx) => {
+              const isLast = idx === feed.length - 1;
+              return (
+                <div
+                  key={item._id}
+                  ref={isLast ? lastItemRef : null}
+                  className="animate-in fade-in slide-in-from-bottom-6 duration-500 transform hover:scale-[1.01] transition-all"
+                  style={{ animationDelay: `${(idx % 6) * 40}ms` }}
+                >
+                  {item.feedType === "project" ? (
+                    <ProjectCard project={item} showOwnerActions />
+                  ) : (
+                    <BlogCard blog={item} showOwnerActions />
+                  )}
                 </div>
-              )}
-            </div>
-          )}
-        </main>
+              );
+            })}
 
-        {/* SIDEBAR */}
-        <aside className="sticky top-24 self-start">
-          <div className="bg-white rounded-3xl border border-gray-100 p-4 shadow-sm mb-6">
-            <h4 className="text-sm font-semibold text-slate-900 mb-3">Top Tags</h4>
-            <div className="flex flex-wrap gap-2">
-              {topTags.length === 0 ? (
-                <div className="text-xs text-slate-400">No tags yet</div>
-              ) : (
-                topTags.map((t) => (
-                  <button
-                    key={t}
-                    onClick={() => handleTagClick(t)}
-                    className={`px-3 py-1 rounded-full text-sm font-semibold ${t === activeTag ? "bg-indigo-600 text-white" : "bg-indigo-50 text-indigo-700 hover:bg-indigo-100"}`}
-                  >
-                    #{t}
-                  </button>
-                ))
-              )}
-            </div>
-
-            {activeTag && (
-              <div className="mt-4 text-sm">
-                <button onClick={clearFilter} className="text-xs font-semibold text-indigo-600">Clear filter</button>
+            {loadingMore && (
+              <div className="flex justify-center py-6">
+                <Loader2 className="w-6 h-6 text-indigo-500 animate-spin" />
               </div>
             )}
           </div>
-
-          <div className="bg-white rounded-3xl border border-gray-100 p-4 shadow-sm">
-            <h4 className="text-sm font-semibold text-slate-900 mb-3">Trending Creators</h4>
-            <div className="flex flex-col gap-3">
-              {feed.slice(0, 6).map((it) => {
-                const author = it.owner || it.author || { name: "Unknown" };
-                return (
-                  <div key={`${it._id}-t`} className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-full bg-indigo-50 flex items-center justify-center text-xs font-extrabold text-indigo-700">
-                      {author?.name?.[0] || "U"}
-                    </div>
-                    <div className="flex-1">
-                      <div className="text-sm font-semibold text-slate-900 leading-4">{author?.name}</div>
-                      <div className="text-xs text-slate-500">Active now</div>
-                    </div>
-                    <button className="text-xs px-3 py-1 rounded-full bg-indigo-50 text-indigo-700 font-semibold">Follow</button>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </aside>
-      </div>
+        )}
+      </main>
     </div>
   );
 };

@@ -284,43 +284,56 @@ exports.deleteProject = async (req, res) => {
 exports.addView = async (req, res) => {
   try {
     const userId = req.userId;
+    const projectId = req.params.id;
 
-    const project = await Project.findById(req.params.id);
-    if (!project) return res.status(404).json({ message: "Project not found" });
+    const project = await Project.findById(projectId);
+    if (!project) {
+      return res.status(404).json({ message: "Project not found" });
+    }
 
+    // prevent duplicate views
     if (project.viewedBy.includes(userId)) {
       return res.json({ views: project.views });
     }
 
-    project.views += 1;
-    project.viewedBy.push(userId);
+    // ✅ atomic update (prevents VersionError)
+    const updatedProject = await Project.findByIdAndUpdate(
+      projectId,
+      {
+        $inc: { views: 1 },
+        $push: { viewedBy: userId }
+      },
+      { new: true }
+    );
 
-    await project.save();
-
-    // Track view interaction and update interest
+    // Track view interaction
     await Interaction.updateOne(
       {
         user: userId,
-        contentId: project._id,
+        contentId: projectId,
         contentType: "Project",
-        action: "view",
+        action: "view"
       },
       { $setOnInsert: { createdAt: new Date() } },
       { upsert: true }
     );
 
+    // Update user interest embedding
     const user = await User.findById(userId);
-    if (user) {
+    if (user && project.embedding) {
       const updatedEmbedding = updateUserEmbedding(
         user.embedding,
         project.embedding,
-        0.5 
+        0.5
       );
-      user.embedding = updatedEmbedding;
-      await user.save();
+
+      await User.findByIdAndUpdate(userId, {
+        embedding: updatedEmbedding
+      });
     }
 
-    res.json({ views: project.views });
+    res.json({ views: updatedProject.views });
+
   } catch (err) {
     console.error("Add View Error:", err);
     res.status(500).json({ message: "Server error" });

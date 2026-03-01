@@ -8,6 +8,7 @@ import ProjectsPage from "./pages/ProjectsPage";
 import UserProfile from "./pages/UserProfile";
 import CreateProject from "./pages/CreateProject";
 import EditProject from "./pages/EditProject";
+import EditProfile from "./pages/EditProfile";
 import SearchPage from "./pages/SearchPage";
 import MainLayout from "./layouts/MainLayout";
 import Trending from "./pages/Trending";
@@ -153,6 +154,17 @@ function App() {
               <ProtectedRoute>
                 <MainLayout>
                   <EditProject />
+                </MainLayout>
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/edit-profile/:id"
+            element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <EditProfile />
                 </MainLayout>
               </ProtectedRoute>
             }

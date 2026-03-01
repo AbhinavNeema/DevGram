@@ -173,11 +173,15 @@ const DM = () => {
     e.target.value = null;
   };
 
-  const startEditMessage = msg => {
-    if (msg.type === "image") return;
-    setEditingMessageId(msg._id);
-    setEditingText(msg.content || "");
-  };
+  const startEditMessage = (msg) => {
+  
+  if (msg.type === "image") return;
+
+  if (!msg._id || String(msg._id).startsWith("c-")) return;
+
+  setEditingMessageId(msg._id);
+  setEditingText(msg.content || "");
+};
 
   const saveEdit = async (msgId) => {
     if (!editingText.trim()) return;
