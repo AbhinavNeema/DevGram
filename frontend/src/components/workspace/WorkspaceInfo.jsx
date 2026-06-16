@@ -114,22 +114,7 @@ const WorkspaceInfo = ({ workspace, onClose, onChannelCreated }) => {
         </div>
 
         {/* FOOTER */}
-        {(isOwner || isAdmin) && (
-          <div className="p-6 border-t border-slate-200 bg-white">
-            <div className="flex items-center gap-2 mb-4">
-              <LayoutGrid className="w-4 h-4 text-indigo-500" />
-              <h4 className="text-xs font-bold text-slate-600 uppercase tracking-widest">
-                Channels
-              </h4>
-            </div>
-
-            <ChannelManager
-              workspaceId={workspace._id}
-              channels={workspace.channels || []}
-              onCreated={onChannelCreated}
-            />
-          </div>
-        )}
+        
       </div>
     </div>
   );

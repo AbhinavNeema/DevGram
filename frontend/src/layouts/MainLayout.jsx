@@ -51,12 +51,7 @@ const MainLayout = ({ children }) => {
       </main>
 
       {/* Floating System Status */}
-      <div className="fixed bottom-6 right-8 hidden lg:block z-30">
-        <div className="flex items-center gap-2 px-3 py-1.5 bg-white border border-gray-200 rounded-full shadow-md text-xs font-semibold text-slate-600">
-          <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-          Systems Operational
-        </div>
-      </div>
+      
 
     </div>
   );
