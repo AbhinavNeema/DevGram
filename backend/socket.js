@@ -1,15 +1,18 @@
 const { Server } = require("socket.io");
-const ChannelMessage = require("./models/ChannelMessage"); // for DM only
+const Message = require("./models/Message"); // for DM only
 
 let io;
+
+const allowedOrigins = [
+  "http://localhost:5173",
+  "http://localhost:5174",
+  process.env.FRONTEND_URL,
+].filter(Boolean);
 
 const initSocket = (server) => {
   io = new Server(server, {
     cors: {
-      origin: [
-        "http://localhost:5173",
-        process.env.FRONTEND_URL,
-      ],
+      origin: allowedOrigins,
       credentials: true,
     },
   });
@@ -21,12 +24,12 @@ const initSocket = (server) => {
       socket.join(conversationId);
     });
 
-    // 🔥 DM MESSAGE (socket owns DM)
+    // DM MESSAGE (socket-based, for real-time sending)
     socket.on("sendDMMessage", async ({ conversationId, senderId, content }) => {
       try {
         if (!content || !content.trim()) return;
 
-        const message = await ChannelMessage.create({
+        const message = await Message.create({
           conversation: conversationId,
           sender: senderId,
           type: "text",
@@ -35,7 +38,8 @@ const initSocket = (server) => {
 
         const populated = await message.populate("sender", "name _id");
 
-        io.to(conversationId).emit("newDMMessage", populated);
+        // Emit newMessage to match frontend listener
+        io.to(conversationId).emit("newMessage", populated);
       } catch (err) {
         console.error("Send DM error:", err);
       }

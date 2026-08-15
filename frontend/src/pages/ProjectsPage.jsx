@@ -1,260 +1,230 @@
-import { useEffect, useRef, useState, useCallback, useMemo } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useEffect, useState } from "react";
 import api from "../api/axios";
+import toast from "react-hot-toast";
 import ProjectCard from "../components/ProjectCard";
-import BlogCard from "../components/BlogCard";
-import { Layers, Zap, Terminal, Loader2, Activity, Plus } from "lucide-react";
-
-const SkeletonItem = ({ idx = 0 }) => (
-  <div
-    className="animate-pulse bg-white rounded-3xl border border-gray-100 shadow-sm p-5"
-    style={{ animationDelay: `${idx * 60}ms` }}
-  >
-    <div className="flex items-center gap-4 mb-4">
-      <div className="w-12 h-12 rounded-2xl bg-gray-100" />
-      <div className="flex-1">
-        <div className="h-4 bg-gray-100 rounded w-3/5 mb-2" />
-        <div className="h-3 bg-gray-100 rounded w-1/3" />
-      </div>
-      <div className="w-20 h-8 bg-gray-100 rounded" />
-    </div>
-
-    <div className="space-y-3">
-      <div className="h-3 bg-gray-100 rounded w-full" />
-      <div className="h-3 bg-gray-100 rounded w-11/12" />
-      <div className="h-40 bg-gray-100 rounded-md" />
-    </div>
-
-    <div className="mt-4 flex items-center gap-4">
-      <div className="h-8 w-20 bg-gray-100 rounded-full" />
-      <div className="h-8 w-10 bg-gray-100 rounded-full ml-auto" />
-    </div>
-  </div>
-);
-
-const safeParsePayload = (res) => {
-  // handle either array response or payload object like before
-  if (!res) return { data: [], cursor: 0, hasMore: false };
-  if (Array.isArray(res.data)) return { data: res.data, cursor: 0, hasMore: false };
-  return {
-    data: res.data?.data || res.data || [],
-    cursor: res.data?.cursor ?? 0,
-    hasMore: res.data?.hasMore ?? false,
-  };
-};
+import { Plus, Loader2, Grid, LayoutList, Search, X, SlidersHorizontal } from "lucide-react";
 
 const ProjectsPage = () => {
-  const [feed, setFeed] = useState([]);
+  const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [cursor, setCursor] = useState(0);
-  const [hasMore, setHasMore] = useState(true);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [searchParams, setSearchParams] = useSearchParams();
-  const activeTag = searchParams.get("tag") || null;
+  const [viewMode, setViewMode] = useState("grid");
+  const [tagFilter, setTagFilter] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [sortBy, setSortBy] = useState("recent");
 
-  // intro animation states
-  const [isFirstHit, setIsFirstHit] = useState(false);
-  const [introFinished, setIntroFinished] = useState(true);
-  const [statusText, setStatusText] = useState("Initializing...");
+  const fetchProjects = async () => {
+    try {
+      setLoading(true);
+      const params = new URLSearchParams();
+      if (tagFilter) params.append("tag", tagFilter);
+      if (searchQuery) params.append("search", searchQuery);
+      if (sortBy) params.append("sort", sortBy);
 
-  // debounce / abort control
-  const fetchAbortRef = useRef(null);
-
-  useEffect(() => {
-    const hasSeenIntro = sessionStorage.getItem("devgram_intro_seen");
-    if (!hasSeenIntro) {
-      setIsFirstHit(true);
-      setIntroFinished(false);
-      sessionStorage.setItem("devgram_intro_seen", "true");
-
-      const messages = ["Connecting to Grid...", "Bypassing Firewalls...", "Fetching Nodes...", "Ready."];
-      messages.forEach((msg, i) => {
-        setTimeout(() => setStatusText(msg), i * 600);
-      });
-
-      setTimeout(() => setIntroFinished(true), 2800);
+      const res = await api.get(`/projects?${params.toString()}`);
+      setProjects(res.data || []);
+    } catch (err) {
+      console.error("Projects fetch failed:", err);
+      toast.error("Failed to load projects");
+    } finally {
+      setLoading(false);
     }
-  }, []);
+  };
 
-  // fetch feed (safe, cancelable, supports initial/next)
-  const fetchFeed = useCallback(
-    async (isInitial = false) => {
-      // cancel previous
-      if (fetchAbortRef.current) {
-        fetchAbortRef.current.abort();
-      }
-      fetchAbortRef.current = new AbortController();
-      const signal = fetchAbortRef.current.signal;
-
-      try {
-        if (isInitial) {
-          setLoading(true);
-          setCursor(0);
-        } else {
-          if (!hasMore) return;
-          setLoadingMore(true);
-        }
-
-        const res = await api.get("/feed", {
-          params: {
-            cursor: isInitial ? 0 : cursor,
-            limit: 12,
-            tag: activeTag || undefined,
-          },
-          signal,
-        });
-
-        const payload = safeParsePayload(res);
-
-        setFeed((prev) => (isInitial ? payload.data : [...prev, ...payload.data]));
-        setCursor(payload.cursor || 0);
-        setHasMore(payload.hasMore ?? false);
-      } catch (err) {
-        if (err.name === "CanceledError" || err?.name === "AbortError") {
-          // ignore
-        } else {
-          console.error("Fetch failed", err);
-          if (isInitial) setFeed([]);
-        }
-      } finally {
-        setLoading(false);
-        setLoadingMore(false);
-      }
-    },
-    [cursor, activeTag, hasMore]
-  );
-
-  // initial load & reload on tag change
   useEffect(() => {
-    setFeed([]);
-    setCursor(0);
-    setHasMore(true);
-    fetchFeed(true);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTag]);
+    fetchProjects();
+  }, [tagFilter, sortBy]);
 
-  // infinite scroll observer
-  const observer = useRef();
-  const lastItemRef = useCallback(
-    (node) => {
-      if (loadingMore) return;
-      if (observer.current) observer.current.disconnect();
+  // Debounced search
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (searchQuery) fetchProjects();
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
-      observer.current = new IntersectionObserver(
-        (entries) => {
-          if (entries[0].isIntersecting && hasMore && !loading && !loadingMore) {
-            fetchFeed(false);
-          }
-        },
-        { rootMargin: "200px" }
-      );
+  return (
+    <div className="max-w-6xl mx-auto px-4 py-8">
+      {/* Header Section */}
+      <div className="relative mb-10">
+        {/* Background glow effects */}
+        <div className="absolute -left-8 -top-8 w-72 h-40 bg-gradient-to-r from-violet-500/15 via-purple-500/15 to-pink-500/15 rounded-3xl blur-3xl -z-10" />
+        <div className="absolute -right-8 -bottom-8 w-64 h-32 bg-gradient-to-r from-cyan-500/10 to-teal-500/10 rounded-3xl blur-3xl -z-10" />
 
-      if (node) observer.current.observe(node);
-    },
-    [loadingMore, hasMore, fetchFeed, loading]
-  );
+        <div className="flex items-center justify-between mb-8">
+          <div className="flex items-center gap-4">
+            {/* Premium icon */}
+            <div className="relative group">
+              <div className="absolute inset-0 bg-gradient-to-br from-violet-500 to-pink-500 rounded-2xl blur-md opacity-50 group-hover:opacity-75 transition-opacity" />
+              <div className="relative p-3 bg-gradient-to-br from-violet-600 via-purple-600 to-pink-600 rounded-2xl shadow-lg shadow-violet-500/30 group-hover:scale-110 transition-transform duration-300">
+                <svg className="w-7 h-7 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                </svg>
+              </div>
+            </div>
 
-  // compute top tags (simple frequency count from feed)
-  const topTags = useMemo(() => {
-    const count = {};
-    feed.forEach((it) => {
-      const arr = (it.techStack || []).slice(0, 6);
-      arr.forEach((t) => (count[t] = (count[t] || 0) + 1));
-    });
-    return Object.entries(count)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 10)
-      .map((e) => e[0]);
-  }, [feed]);
-
-  const handleTagClick = (value) => {
-    setSearchParams((prev) => {
-      prev.set("tag", value);
-      return prev;
-    });
-  };
-
-  const clearFilter = () => {
-    setSearchParams((prev) => {
-      prev.delete("tag");
-      return prev;
-    });
-  };
-
-  // layout: two-column on lg: feed (2/3) + sidebar (1/3)
-  return isFirstHit && !introFinished ? (
-    <div className="fixed inset-0 z-[200] bg-indigo-900/95 flex flex-col items-center justify-center font-mono">
-      <div className="flex flex-col items-center gap-8">
-        <div className="w-24 h-24 bg-indigo-600 rounded-3xl flex items-center justify-center shadow-[0_0_80px_rgba(79,70,229,0.45)] animate-in zoom-in duration-700">
-          <Terminal className="text-white w-12 h-12 stroke-[2.5px]" />
-        </div>
-
-        <h1 className="text-6xl md:text-7xl font-black text-white tracking-[0.08em] uppercase italic animate-typing">DevGram</h1>
-
-        <div className="flex flex-col items-center gap-3">
-          <div className="flex items-center gap-3">
-            <Activity className="w-4 h-4 text-indigo-300 animate-pulse" />
-            <span className="text-xs font-black text-indigo-300 uppercase tracking-wider">{statusText}</span>
+            <div>
+              <h1 className="text-3xl font-black text-slate-900 dark:text-white flex items-center gap-2">
+                Explore
+                <span className="text-transparent bg-clip-text bg-gradient-to-r from-violet-600 via-purple-600 to-pink-600">Projects</span>
+              </h1>
+              <p className="text-sm text-slate-500 dark:text-slate-400 font-medium">Discover amazing projects from the community</p>
+            </div>
           </div>
 
-          <div className="w-56 h-1 bg-white/10 rounded-full overflow-hidden">
-            <div className="h-full bg-indigo-500 animate-progress" />
+          {/* Create button */}
+          <a
+            href="/projects/create"
+            className="group relative flex items-center gap-2 px-5 py-3 bg-gradient-to-r from-violet-600 via-purple-600 to-pink-600 text-white font-bold rounded-2xl shadow-lg shadow-violet-500/30 hover:shadow-xl hover:shadow-violet-500/40 transition-all duration-300 hover:scale-105 active:scale-95 overflow-hidden"
+          >
+            <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/20 to-white/0 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+            <Plus className="w-5 h-5 relative z-10" />
+            <span className="relative z-10">Create Project</span>
+          </a>
+        </div>
+
+        {/* Search and Filter Bar */}
+        <div className="flex flex-wrap items-center gap-4 p-4 glass-panel rounded-2xl border border-violet-200/30 dark:border-violet-800/30 bg-gradient-to-r from-white/60 via-violet-50/30 to-pink-50/30 dark:from-slate-900/60 dark:via-violet-950/20 dark:to-pink-950/20 backdrop-blur-xl">
+          {/* Search Input */}
+          <div className="relative flex-1 min-w-[200px]">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+            <input
+              type="text"
+              placeholder="Search projects..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-12 pr-10 py-3 bg-white/80 dark:bg-slate-800/80 rounded-xl border border-violet-200/50 dark:border-violet-700/50 text-slate-800 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-violet-500/50 focus:ring-2 focus:ring-violet-500/20 transition-all duration-300"
+            />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery("")}
+                className="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
+          </div>
+
+          {/* Tag Filter */}
+          <div className="flex items-center gap-2">
+            <div className="relative">
+              <SlidersHorizontal className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-violet-500" />
+              <input
+                type="text"
+                placeholder="Filter by tag..."
+                value={tagFilter}
+                onChange={(e) => setTagFilter(e.target.value)}
+                className="pl-10 pr-4 py-3 bg-white/80 dark:bg-slate-800/80 rounded-xl border border-violet-200/50 dark:border-violet-700/50 text-slate-800 dark:text-white placeholder:text-slate-400 text-sm focus:outline-none focus:border-violet-500/50 focus:ring-2 focus:ring-violet-500/20 transition-all duration-300 w-40"
+              />
+            </div>
+            {tagFilter && (
+              <button
+                onClick={() => setTagFilter("")}
+                className="p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/30 rounded-xl transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
+          </div>
+
+          {/* Sort Dropdown */}
+          <select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value)}
+            className="px-4 py-3 bg-white/80 dark:bg-slate-800/80 rounded-xl border border-violet-200/50 dark:border-violet-700/50 text-slate-800 dark:text-white text-sm focus:outline-none focus:border-violet-500/50 cursor-pointer transition-all duration-300 appearance-none"
+          >
+            <option value="recent">Most Recent</option>
+            <option value="popular">Most Popular</option>
+            <option value="discussed">Most Discussed</option>
+          </select>
+
+          {/* View Toggle */}
+          <div className="flex items-center gap-1 p-1 bg-white/60 dark:bg-slate-800/60 rounded-xl border border-violet-200/30 dark:border-violet-700/30">
+            <button
+              onClick={() => setViewMode("grid")}
+              className={`p-2.5 rounded-lg transition-all duration-300 ${viewMode === "grid" ? "bg-gradient-to-br from-violet-500 to-pink-500 text-white shadow-lg" : "text-slate-500 hover:text-violet-600 hover:bg-violet-50 dark:hover:bg-violet-900/30"}`}
+            >
+              <Grid className="w-5 h-5" />
+            </button>
+            <button
+              onClick={() => setViewMode("list")}
+              className={`p-2.5 rounded-lg transition-all duration-300 ${viewMode === "list" ? "bg-gradient-to-br from-violet-500 to-pink-500 text-white shadow-lg" : "text-slate-500 hover:text-violet-600 hover:bg-violet-50 dark:hover:bg-violet-900/30"}`}
+            >
+              <LayoutList className="w-5 h-5" />
+            </button>
           </div>
         </div>
       </div>
 
-      <style>{`
-        @keyframes typing { from { width: 0 } to { width: 100% } }
-        @keyframes progress { from { width: 0 } to { width: 100% } }
-        .animate-typing { animation: typing 1.6s steps(7,end) forwards; }
-        .animate-progress { animation: progress 2.6s linear forwards; }
-      `}</style>
-    </div>
-  ) : (
-    <div className="max-w-2xl mx-auto">
-      {/* layout grid */}
-      <main>
-        {loading ? (
-          <div className="space-y-8">
-            {[0, 1, 2, 3].map((i) => <SkeletonItem key={i} idx={i} />)}
+      {/* Loading State */}
+      {loading && (
+        <div className="flex flex-col items-center justify-center py-24 gap-6">
+          <div className="relative">
+            <div className="absolute inset-0 bg-gradient-to-r from-violet-500 via-purple-500 to-pink-500 rounded-full blur-xl opacity-50 animate-pulse" />
+            <Loader2 className="relative w-12 h-12 animate-spin text-gradient-fire" />
           </div>
-        ) : feed.length === 0 ? (
-          <div className="text-center py-24 bg-white rounded-3xl border border-gray-100">
-            <Layers className="mx-auto w-12 h-12 text-slate-400 mb-4" />
-            <h3 className="text-xl font-extrabold text-slate-900 uppercase tracking-tight">No Signal Detected</h3>
-            <p className="text-sm text-slate-500 mt-2">Try clearing filters or create a new post to kickstart the stream.</p>
-            <div className="mt-6">
-              <button onClick={clearFilter} className="px-5 py-2 bg-indigo-600 text-white rounded-xl">Clear Filters</button>
-            </div>
+          <div className="text-center">
+            <p className="text-lg font-bold text-slate-700 dark:text-slate-300 mb-1">Loading projects</p>
+            <p className="text-sm text-slate-400">Fetching amazing work from the community</p>
           </div>
-        ) : (
-          <div className="space-y-8">
-            {feed.map((item, idx) => {
-              const isLast = idx === feed.length - 1;
-              return (
-                <div
-                  key={item._id}
-                  ref={isLast ? lastItemRef : null}
-                  className="animate-in fade-in slide-in-from-bottom-6 duration-500 transform hover:scale-[1.01] transition-all"
-                  style={{ animationDelay: `${(idx % 6) * 40}ms` }}
-                >
-                  {item.feedType === "project" ? (
-                    <ProjectCard project={item} showOwnerActions />
-                  ) : (
-                    <BlogCard blog={item} showOwnerActions />
-                  )}
-                </div>
-              );
-            })}
+        </div>
+      )}
 
-            {loadingMore && (
-              <div className="flex justify-center py-6">
-                <Loader2 className="w-6 h-6 text-indigo-500 animate-spin" />
+      {/* Empty State */}
+      {!loading && projects.length === 0 && (
+        <div className="relative text-center py-24 glass-panel border border-violet-200/30 dark:border-violet-800/30 rounded-3xl overflow-hidden">
+          <div className="absolute inset-0 bg-gradient-to-br from-violet-50/50 via-purple-50/30 to-pink-50/50 dark:from-slate-900/80 dark:via-violet-950/20 dark:to-pink-950/20" />
+          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-96 h-32 bg-gradient-to-b from-violet-500/10 to-transparent rounded-full blur-3xl" />
+
+          <div className="relative">
+            <div className="relative inline-block mb-6">
+              <div className="absolute inset-0 bg-gradient-to-br from-violet-500/20 to-pink-500/20 rounded-full blur-2xl" />
+              <div className="relative w-20 h-20 mx-auto bg-gradient-to-br from-violet-100 to-pink-100 dark:from-violet-900/50 dark:to-pink-900/50 rounded-2xl flex items-center justify-center border border-violet-200/50 dark:border-violet-800/50">
+                <svg className="w-10 h-10 text-violet-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                </svg>
               </div>
-            )}
+            </div>
+
+            <h3 className="text-2xl font-black text-slate-900 dark:text-white mb-2">
+              No projects found
+            </h3>
+            <p className="text-slate-500 dark:text-slate-400 mb-8 max-w-md mx-auto">
+              {searchQuery || tagFilter
+                ? "Try adjusting your filters or search terms"
+                : "Be the first to create an amazing project!"}
+            </p>
+
+            <a
+              href="/projects/create"
+              className="group relative inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-violet-600 via-purple-600 to-pink-600 text-white font-bold rounded-xl shadow-lg shadow-violet-500/30 hover:shadow-xl hover:shadow-violet-500/40 transition-all duration-300 hover:scale-105 active:scale-95"
+            >
+              <Plus className="w-5 h-5" />
+              Create Project
+            </a>
           </div>
-        )}
-      </main>
+        </div>
+      )}
+
+      {/* Projects Grid */}
+      {!loading && projects.length > 0 && (
+        <>
+          {/* Results count */}
+          <div className="flex items-center justify-between mb-6">
+            <p className="text-sm font-medium text-slate-500 dark:text-slate-400">
+              <span className="font-bold text-violet-600 dark:text-violet-400">{projects.length}</span> projects found
+            </p>
+          </div>
+
+          <div className={viewMode === "grid"
+            ? "grid grid-cols-1 md:grid-cols-2 gap-6"
+            : "space-y-6"
+          }>
+            {projects.map((project) => (
+              <ProjectCard key={project._id} project={project} />
+            ))}
+          </div>
+        </>
+      )}
     </div>
   );
 };

@@ -24,6 +24,9 @@ const messageSchema = new mongoose.Schema(
         ref: "User",
       },
     ],
+    cloudinaryId: {
+      type: String,
+    },
   },
   { timestamps: true }
 );

@@ -14,6 +14,14 @@ exports.register = async (req, res) => {
       return res.status(400).json({ message: "Invalid username format" });
     }
 
+    if (password.length < 6) {
+      return res.status(400).json({ message: "Password must be at least 6 characters" });
+    }
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return res.status(400).json({ message: "Invalid email format" });
+    }
+
     const usernameExists = await User.findOne({ username });
     if (usernameExists) {
       return res.status(409).json({ message: "Username already taken" });

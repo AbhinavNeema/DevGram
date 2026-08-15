@@ -4,13 +4,33 @@ const ALLOWED_TAGS = require("../constants/tags");
 const User = require("../models/User");
 const Interaction = require("../models/Interaction");
 const { generateEmbedding } = require("../utils/embedding");
-const { updateUserEmbedding } = require("../utils/vector");
+const { updateUserEmbedding, cosineSimilarity } = require("../utils/vector");
+
+/* CREATE PROJECT */
 exports.createProject = async (req, res) => {
   try {
-    const { title, description, githubLink, liveDemoLink, mentions = "[]" } = req.body;
+    const {
+      title,
+      description,
+      githubLink,
+      liveDemoLink,
+      mentions = "[]"
+    } = req.body;
 
-    const techStack = JSON.parse(req.body.techStack || "[]");
-    const parsedMentions = JSON.parse(mentions);
+    if (!title || !title.trim()) {
+      return res.status(400).json({ message: "Title is required" });
+    }
+
+    const techStack = Array.isArray(req.body.techStack)
+      ? req.body.techStack
+      : JSON.parse(req.body.techStack || "[]");
+
+    // Filter against allowed tags
+    const filteredTags = techStack.filter(tag => ALLOWED_TAGS.includes(tag));
+
+    const parsedMentions = Array.isArray(mentions)
+      ? mentions
+      : JSON.parse(mentions);
 
     const images = [];
 
@@ -23,58 +43,100 @@ exports.createProject = async (req, res) => {
       }
     }
 
-    // 🔥 Generate semantic embedding
+    // Generate semantic embedding (non-blocking)
     const textForEmbedding = `
 ${title}
-${description}
-${techStack.join(" ")}
-    `;
+${description || ""}
+${filteredTags.join(" ")}
+    `.trim();
 
-    const embedding = await generateEmbedding(textForEmbedding);
-
+    // Create project first, then add embedding in background
     const project = await Project.create({
-      title,
-      description,
-      techStack,
-      githubLink,
-      liveDemoLink,
+      title: title.trim(),
+      description: description?.trim() || "",
+      techStack: filteredTags,
+      githubLink: githubLink?.trim() || "",
+      liveDemoLink: liveDemoLink?.trim() || "",
       images,
       owner: req.userId,
       mentions: parsedMentions,
-      embedding,
+      embedding: [], // Start empty
     });
 
-    res.status(201).json(project);
+    // Add embedding in background (don't block response)
+    generateEmbedding(textForEmbedding)
+      .then(embedding => {
+        if (embedding && embedding.length > 0) {
+          Project.findByIdAndUpdate(project._id, { embedding }).catch(err => {
+            console.warn("Failed to update project embedding:", err.message);
+          });
+        }
+      })
+      .catch(err => console.warn("Embedding generation failed:", err.message));
+
+    const populated = await Project.findById(project._id)
+      .populate("owner", "name username");
+
+    res.status(201).json(populated);
   } catch (err) {
+    console.error("Create Project Error:", err);
+    if (err instanceof SyntaxError) {
+      return res.status(400).json({ message: "Invalid JSON format" });
+    }
     res.status(500).json({ message: "Server error" });
   }
 };
 
+/* GET PROJECTS (with pagination and filtering) */
 exports.getProjects = async (req, res) => {
   try {
-    const { tag } = req.query;
+    const { tag, limit = 50, offset = 0 } = req.query;
 
     const query = {};
 
-    // 🔥 FILTER LOGIC
     if (tag) {
       query.techStack = tag;
     }
 
     const projects = await Project.find(query)
-      .populate("owner", "name username")
+      .populate("owner", "name username profilePhoto")
       .populate("comments.author", "name username")
       .populate("comments.mentions", "username")
       .populate("mentions", "username")
-      .sort({ createdAt: -1 });
+      .sort({ createdAt: -1 })
+      .skip(parseInt(offset))
+      .limit(parseInt(limit));
 
-    res.json(projects);
+    const total = await Project.countDocuments(query);
+
+    res.json({ projects, total, limit: parseInt(limit), offset: parseInt(offset) });
   } catch (err) {
     console.error("Get Projects Error:", err);
     res.status(500).json({ message: "Server error" });
   }
 };
 
+/* GET PROJECT BY ID */
+exports.getProjectById = async (req, res) => {
+  try {
+    const project = await Project.findById(req.params.id)
+      .populate("owner", "name username profilePhoto")
+      .populate("comments.author", "name username")
+      .populate("comments.mentions", "username")
+      .populate("mentions", "username");
+
+    if (!project) {
+      return res.status(404).json({ message: "Project not found" });
+    }
+
+    res.json(project);
+  } catch (err) {
+    console.error("Get Project By ID Error:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+/* LIKE PROJECT */
 exports.likeProject = async (req, res) => {
   try {
     const userId = req.userId;
@@ -87,59 +149,56 @@ exports.likeProject = async (req, res) => {
 
     const hasLiked = project.likes.includes(userId);
 
-    let updatedProject;
-
     if (hasLiked) {
-      updatedProject = await Project.findByIdAndUpdate(
-        projectId,
-        { $pull: { likes: userId } },
-        { new: true }
-      );
-    } else {
-      updatedProject = await Project.findByIdAndUpdate(
-        projectId,
-        { $addToSet: { likes: userId } },
-        { new: true }
-      );
-    }
+      // Unlike
+      project.likes.pull(userId);
+      await project.save();
 
-    // Handle interaction safely (no duplicates)
-    if (!hasLiked) {
-      // Add like interaction (upsert to prevent duplicates)
-      await Interaction.updateOne(
-        {
-          user: userId,
-          contentId: projectId,
-          contentType: "Project",
-          action: "like",
-        },
-        { $setOnInsert: { createdAt: new Date() } },
-        { upsert: true }
-      );
-
-      const user = await User.findById(userId);
-      if (user) {
-        const updatedEmbedding = updateUserEmbedding(
-          user.embedding,
-          project.embedding,
-          2 // like weight
-        );
-        user.embedding = updatedEmbedding;
-        await user.save();
-      }
-    } else {
-      // Remove like interaction on unlike
+      // Remove like interaction
       await Interaction.deleteOne({
         user: userId,
         contentId: projectId,
         contentType: "Project",
         action: "like",
       });
+
+      return res.json({
+        liked: false,
+        likesCount: project.likes.length,
+      });
+    }
+
+    // Like
+    project.likes.push(userId);
+    await project.save();
+
+    // Track interaction
+    await Interaction.updateOne(
+      {
+        user: userId,
+        contentId: projectId,
+        contentType: "Project",
+        action: "like",
+      },
+      { $setOnInsert: { createdAt: new Date() } },
+      { upsert: true }
+    );
+
+    // Update user embedding
+    const user = await User.findById(userId);
+    if (user && project.embedding?.length > 0) {
+      const updatedEmbedding = updateUserEmbedding(
+        user.embedding,
+        project.embedding,
+        2 // like weight
+      );
+      user.embedding = updatedEmbedding;
+      await user.save();
     }
 
     res.json({
-      liked: !hasLiked,
-      likesCount: updatedProject.likes.length,
+      liked: true,
+      likesCount: project.likes.length,
     });
   } catch (err) {
     console.error("Like Project Error:", err);
@@ -147,27 +206,83 @@ exports.likeProject = async (req, res) => {
   }
 };
 
+/* ADD VIEW */
+exports.addView = async (req, res) => {
+  try {
+    const userId = req.userId;
+    const projectId = req.params.id;
+
+    const project = await Project.findById(projectId);
+    if (!project) {
+      return res.status(404).json({ message: "Project not found" });
+    }
+
+    // Prevent duplicate views
+    if (project.viewedBy.includes(userId)) {
+      return res.json({ views: project.views });
+    }
+
+    // Atomic update
+    const updatedProject = await Project.findByIdAndUpdate(
+      projectId,
+      {
+        $inc: { views: 1 },
+        $push: { viewedBy: userId },
+      },
+      { new: true }
+    );
+
+    // Track interaction
+    await Interaction.updateOne(
+      {
+        user: userId,
+        contentId: projectId,
+        contentType: "Project",
+        action: "view",
+      },
+      { $setOnInsert: { createdAt: new Date() } },
+      { upsert: true }
+    );
+
+    // Update user embedding
+    const user = await User.findById(userId);
+    if (user && project.embedding?.length > 0) {
+      const updatedEmbedding = updateUserEmbedding(
+        user.embedding,
+        project.embedding,
+        0.5
+      );
+      await User.findByIdAndUpdate(userId, { embedding: updatedEmbedding });
+    }
+
+    res.json({ views: updatedProject.views });
+  } catch (err) {
+    console.error("Add View Error:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+/* ADD COMMENT */
 exports.addComment = async (req, res) => {
   try {
     const { text, mentions = [] } = req.body;
 
+    if (!text || !text.trim()) {
+      return res.status(400).json({ message: "Comment text is required" });
+    }
+
     const project = await Project.findById(req.params.id);
-    console.log("📝 Add Comment Hit");
-    console.log("Project ID:", req.params.id);
-    console.log("User ID:", req.userId);
     if (!project) return res.status(404).json({ message: "Project not found" });
 
     project.comments.push({
-      text,
+      text: text.trim(),
       author: req.userId,
-      mentions
+      mentions: mentions.filter(Boolean),
     });
 
     await project.save();
-    console.log("✅ Comment pushed successfully. Total comments:", project.comments.length);
 
-    // Track comment interaction and update interest
-    console.log("🔁 Updating interaction for comment...");
+    // Track interaction
     await Interaction.updateOne(
       {
         user: req.userId,
@@ -179,16 +294,16 @@ exports.addComment = async (req, res) => {
       { upsert: true }
     );
 
+    // Update user embedding
     const user = await User.findById(req.userId);
-    if (user) {
+    if (user && project.embedding?.length > 0) {
       const updatedEmbedding = updateUserEmbedding(
         user.embedding,
         project.embedding,
-        3 // comment weight
+        3
       );
       user.embedding = updatedEmbedding;
       await user.save();
-      console.log("💾 User embedding updated successfully");
     }
 
     const updated = await Project.findById(project._id)
@@ -197,11 +312,12 @@ exports.addComment = async (req, res) => {
 
     res.json(updated.comments.at(-1));
   } catch (err) {
-    console.error("❌ Add Comment Error:", err);
+    console.error("Add Comment Error:", err);
     res.status(500).json({ message: "Server error" });
   }
 };
 
+/* DELETE COMMENT */
 exports.deleteComment = async (req, res) => {
   try {
     const { projectId, commentId } = req.params;
@@ -212,151 +328,94 @@ exports.deleteComment = async (req, res) => {
     const comment = project.comments.id(commentId);
     if (!comment) return res.status(404).json({ message: "Comment not found" });
 
-    if (comment.author.toString() !== req.userId)
-      return res.status(403).json({ message: "Not allowed" });
+    // Only author can delete
+    if (comment.author.toString() !== req.userId) {
+      return res.status(403).json({ message: "Not authorized" });
+    }
 
     comment.deleteOne();
     await project.save();
 
     res.json({ message: "Comment deleted", commentId });
-  } catch (error) {
-    console.error("Delete Comment Error:", error);
+  } catch (err) {
+    console.error("Delete Comment Error:", err);
     res.status(500).json({ message: "Server error" });
   }
 };
 
+/* UPDATE PROJECT */
 exports.updateProject = async (req, res) => {
   try {
     const project = await Project.findById(req.params.id);
     if (!project) return res.status(404).json({ message: "Project not found" });
 
-    if (project.owner.toString() !== req.userId)
+    // Only owner can update
+    if (project.owner.toString() !== req.userId) {
       return res.status(403).json({ message: "Not authorized" });
-
-    project.title = req.body.title ?? project.title;
-    project.description = req.body.description ?? project.description;
-    project.githubLink = req.body.githubLink ?? project.githubLink;
-    project.liveDemoLink = req.body.liveDemoLink ?? project.liveDemoLink;
-
-    if (req.body.mentions) {
-      project.mentions = req.body.mentions;
     }
 
-    if (req.body.techStack) {
-      project.techStack = req.body.techStack.filter(tag =>
-        ALLOWED_TAGS.includes(tag)
-      );
+    const { title, description, githubLink, liveDemoLink, mentions, techStack } = req.body;
+
+    if (title) project.title = title.trim();
+    if (description !== undefined) project.description = description.trim();
+    if (githubLink !== undefined) project.githubLink = githubLink?.trim() || "";
+    if (liveDemoLink !== undefined) project.liveDemoLink = liveDemoLink?.trim() || "";
+    if (mentions) project.mentions = mentions;
+    if (techStack) {
+      project.techStack = techStack.filter(tag => ALLOWED_TAGS.includes(tag));
     }
 
     await project.save();
 
     const updated = await Project.findById(project._id)
       .populate("owner", "name username")
+      .populate("comments.author", "name username")
       .populate("mentions", "username");
 
     res.json(updated);
   } catch (err) {
+    console.error("Update Project Error:", err);
     res.status(500).json({ message: "Server error" });
   }
 };
+
+/* DELETE PROJECT */
 exports.deleteProject = async (req, res) => {
   try {
     const project = await Project.findById(req.params.id);
     if (!project) return res.status(404).json({ message: "Project not found" });
 
-    if (project.owner.toString() !== req.userId)
+    // Only owner can delete
+    if (project.owner.toString() !== req.userId) {
       return res.status(403).json({ message: "Not authorized" });
+    }
 
+    // Delete images from Cloudinary
     for (const img of project.images) {
       if (img.public_id) {
-        await cloudinary.uploader.destroy(img.public_id);
+        try {
+          await cloudinary.uploader.destroy(img.public_id);
+        } catch (err) {
+          console.warn("Cloudinary delete failed:", err.message);
+        }
       }
     }
 
+    // Delete related interactions
+    await Interaction.deleteMany({
+      contentId: project._id,
+      contentType: "Project",
+    });
+
     await project.deleteOne();
-    res.json({ message: "Project deleted" });
+    res.json({ success: true });
   } catch (err) {
     console.error("Delete Project Error:", err);
     res.status(500).json({ message: "Server error" });
   }
 };
 
-exports.addView = async (req, res) => {
-  try {
-    const userId = req.userId;
-    const projectId = req.params.id;
-
-    const project = await Project.findById(projectId);
-    if (!project) {
-      return res.status(404).json({ message: "Project not found" });
-    }
-
-    // prevent duplicate views
-    if (project.viewedBy.includes(userId)) {
-      return res.json({ views: project.views });
-    }
-
-    // ✅ atomic update (prevents VersionError)
-    const updatedProject = await Project.findByIdAndUpdate(
-      projectId,
-      {
-        $inc: { views: 1 },
-        $push: { viewedBy: userId }
-      },
-      { new: true }
-    );
-
-    // Track view interaction
-    await Interaction.updateOne(
-      {
-        user: userId,
-        contentId: projectId,
-        contentType: "Project",
-        action: "view"
-      },
-      { $setOnInsert: { createdAt: new Date() } },
-      { upsert: true }
-    );
-
-    // Update user interest embedding
-    const user = await User.findById(userId);
-    if (user && project.embedding) {
-      const updatedEmbedding = updateUserEmbedding(
-        user.embedding,
-        project.embedding,
-        0.5
-      );
-
-      await User.findByIdAndUpdate(userId, {
-        embedding: updatedEmbedding
-      });
-    }
-
-    res.json({ views: updatedProject.views });
-
-  } catch (err) {
-    console.error("Add View Error:", err);
-    res.status(500).json({ message: "Server error" });
-  }
-};
-exports.getProjectById = async (req, res) => {
-  try {
-    const project = await Project.findById(req.params.id)
-      .populate("owner", "name username")
-      .populate("comments.author", "name username")
-      .populate("comments.mentions", "username")
-      .populate("mentions", "username")
-
-    if (!project) {
-      return res.status(404).json({ message: "Project not found" });
-    }
-
-    res.json(project);
-  } catch (error) {
-    console.error("Get Project By ID Error:", error);
-    res.status(500).json({ message: "Server error" });
-  }
-};
+/* GET TRENDING PROJECTS */
 exports.getTrendingProjects = async (req, res) => {
   try {
     const userId = req.userId;
@@ -368,13 +427,13 @@ exports.getTrendingProjects = async (req, res) => {
       filter.seenBy = { $ne: userId };
     }
 
-    const RECENT_LIMIT = 500;
+    const RECENT_LIMIT = 200;
 
     const projects = await Project.find(filter)
-      .sort({ createdAt: -1 }) // recent pool first
+      .sort({ createdAt: -1 })
       .limit(RECENT_LIMIT)
-      .select("title description owner createdAt likes views comments embedding")
-      .populate("owner", "name username")
+      .select("title description owner createdAt likes views comments embedding techStack")
+      .populate("owner", "name username profilePhoto")
       .lean();
 
     if (!projects.length) {
@@ -387,50 +446,38 @@ exports.getTrendingProjects = async (req, res) => {
       const views = project.views || 0;
 
       // Engagement (weighted)
-      const engagementScore =
-        likes * 2 +
-        comments * 3 +
-        views * 0.2;
+      const engagementScore = likes * 2 + comments * 3 + views * 0.1;
 
       // Recency decay (half-life ~48h)
-      const ageHours =
-        (Date.now() - new Date(project.createdAt)) /
-        (1000 * 60 * 60);
-
+      const ageHours = (Date.now() - new Date(project.createdAt)) / (1000 * 60 * 60);
       const recencyScore = Math.exp(-ageHours / 48);
 
       // Final trending score
-      return (
-        0.7 * engagementScore +
-        0.3 * recencyScore
-      );
+      return 0.7 * engagementScore + 0.3 * recencyScore;
     };
 
     const ranked = projects
-      .map(p => ({
-        ...p,
-        score: scoreProject(p),
-      }))
+      .map(p => ({ ...p, score: scoreProject(p) }))
       .sort((a, b) => b.score - a.score)
       .slice(0, 10);
 
-    // Mark as seen only in production
+    // Mark as seen in production
     if (productionMode && ranked.length > 0) {
       const projectIds = ranked.map(p => p._id);
-
-      await Project.updateMany(
+      Project.updateMany(
         { _id: { $in: projectIds } },
         { $addToSet: { seenBy: userId } }
-      );
+      ).catch(err => console.warn("Trending seen update error:", err.message));
     }
 
     res.json(ranked);
-
-  } catch (error) {
-    console.error("Trending Error:", error);
+  } catch (err) {
+    console.error("Trending Error:", err);
     res.status(500).json({ message: "Server error" });
   }
 };
+
+/* GET PERSONALIZED FEED (projects only) */
 exports.getPersonalizedFeed = async (req, res) => {
   try {
     const user = await User.findById(req.userId).lean();
@@ -439,75 +486,59 @@ exports.getPersonalizedFeed = async (req, res) => {
     const userEmbedding = user.embedding || [];
     const followingIds = (user.following || []).map(id => id.toString());
 
-    const limit = Number(req.query.limit || 20);
+    const limit = Math.min(Number(req.query.limit || 20), 50);
     const cursor = Number(req.query.cursor || 0);
 
-    // Retrieve recent candidate pool (scalable later)
-    const RECENT_LIMIT = 500;
+    const RECENT_LIMIT = 200;
 
     const projects = await Project.find({})
       .sort({ createdAt: -1 })
       .limit(RECENT_LIMIT)
       .select("title description techStack owner createdAt likes views comments embedding")
-      .populate("owner", "name username")
+      .populate("owner", "name username profilePhoto")
       .lean();
 
     const scoreProject = (project) => {
-      // 1️⃣ Semantic similarity
-      const similarity = updateUserEmbedding
-        ? require("../utils/vector").cosineSimilarity(userEmbedding, project.embedding || [])
-        : 0;
+      // Semantic similarity
+      let similarity = 0;
+      if (userEmbedding.length > 0 && project.embedding?.length > 0) {
+        similarity = cosineSimilarity(userEmbedding, project.embedding);
+      }
 
-      // 2️⃣ Recency decay (half-life ~3 days)
-      const ageHours =
-        (Date.now() - new Date(project.createdAt)) / (1000 * 60 * 60);
+      // Recency decay
+      const ageHours = (Date.now() - new Date(project.createdAt)) / (1000 * 60 * 60);
       const recencyScore = Math.exp(-ageHours / 72);
 
-      // 3️⃣ Engagement score
+      // Engagement score
       const likes = project.likes?.length || 0;
       const comments = project.comments?.length || 0;
       const views = project.views || 0;
-      const engagementScore = likes * 2 + comments * 3 + views * 0.2;
+      const engagementScore = likes * 2 + comments * 3 + views * 0.1;
 
-      // 4️⃣ Follow boost
-      const followBoost = followingIds.includes(
-        project.owner?._id?.toString()
-      )
-        ? 5
-        : 0;
+      // Follow boost
+      const followBoost = followingIds.includes(project.owner?._id?.toString()) ? 5 : 0;
 
-      // Final weighted score
-      return (
-        0.6 * similarity +
-        0.15 * recencyScore +
-        0.15 * engagementScore +
-        0.1 * followBoost
-      );
+      return 0.5 * similarity + 0.2 * recencyScore + 0.2 * engagementScore + 0.1 * followBoost;
     };
 
     let ranked = projects
-      .map((p) => ({
-        ...p,
-        feedType: "project",
-        score: scoreProject(p),
-      }))
+      .map(p => ({ ...p, feedType: "project", score: scoreProject(p) }))
       .sort((a, b) => b.score - a.score);
 
-    // Diversity injection: mix in some trending if too similar
+    // Add trending diversity
     const trending = [...ranked]
       .sort((a, b) =>
-        (b.likes?.length || 0) + (b.views || 0) -
+        ((b.likes?.length || 0) + (b.views || 0)) -
         ((a.likes?.length || 0) + (a.views || 0))
       )
       .slice(0, 5);
 
     const topPersonalized = ranked.slice(0, 15);
-
     const mixedFeed = [...topPersonalized, ...trending];
 
-    // Remove duplicates
+    // Deduplicate
     const uniqueFeed = Array.from(
-      new Map(mixedFeed.map((item) => [item._id.toString(), item])).values()
+      new Map(mixedFeed.map(item => [item._id.toString(), item])).values()
     );
 
     const paginated = uniqueFeed.slice(cursor, cursor + limit);
@@ -518,7 +549,7 @@ exports.getPersonalizedFeed = async (req, res) => {
       data: paginated,
     });
   } catch (err) {
-    console.error("Elite Feed Error:", err);
+    console.error("Personalized Feed Error:", err);
     res.status(500).json({ message: "Server error" });
   }
 };

@@ -1,25 +1,27 @@
 import { useState } from "react";
 import api from "../../api/axios";
-import { Mail, Send, Loader2, CheckCircle2, AlertCircle } from "lucide-react";
+import toast from "react-hot-toast";
+import { Mail, Send, Loader2 } from "lucide-react";
 
 const InviteMember = ({ workspaceId }) => {
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
-  const [status, setStatus] = useState(null); // 'success' | 'error' | null
 
   const invite = async () => {
-    if (!email.trim()) return;
+    if (!email.trim()) {
+      toast.error("Please enter an email address");
+      return;
+    }
 
     try {
       setLoading(true);
-      setStatus(null);
       await api.post(`/workspaces/${workspaceId}/invite`, { email });
       setEmail("");
-      setStatus("success");
-      setTimeout(() => setStatus(null), 3000);
-    } catch {
-      setStatus("error");
-      setTimeout(() => setStatus(null), 3000);
+      toast.success("Invitation sent successfully!");
+    } catch (err) {
+      console.error("Invite failed:", err);
+      const message = err.response?.data?.message || "Failed to send invitation";
+      toast.error(message);
     } finally {
       setLoading(false);
     }
@@ -75,23 +77,7 @@ const InviteMember = ({ workspaceId }) => {
     </div>
 
 
-    {/* FEEDBACK */}
-
-    {status === "success" && (
-      <div className="flex items-center gap-2 mt-2 text-green-600 text-sm">
-        <CheckCircle2 className="w-4 h-4"/>
-        Invitation sent successfully
-      </div>
-    )}
-
-    {status === "error" && (
-      <div className="flex items-center gap-2 mt-2 text-red-600 text-sm">
-        <AlertCircle className="w-4 h-4"/>
-        Failed to send invite
-      </div>
-    )}
-
-  </div>
+    </div>
 );
 };
 

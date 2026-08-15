@@ -1,7 +1,7 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "./context/AuthContext";
+import { ThemeProvider } from "./context/ThemeContext";
 import ProtectedRoute from "./routes/ProtectedRoute";
-import { Toaster } from "react-hot-toast";
 import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
 import ProjectsPage from "./pages/ProjectsPage";
@@ -22,8 +22,9 @@ import CreateWorkspace from "./pages/workspace/CreateWorkspace";
 import Invite from "./pages/invite/Invite";
 function App() {
   return (
-    <AuthProvider>
-      <BrowserRouter>
+    <ThemeProvider defaultTheme="system" storageKey="devgram-theme">
+      <AuthProvider>
+        <BrowserRouter>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
@@ -68,6 +69,14 @@ function App() {
           }
         />
 
+        <Route
+          path="/workspaces/create"
+          element={<ProtectedRoute>
+              <MainLayout>
+                <CreateWorkspace />
+              </MainLayout>
+            </ProtectedRoute>}
+        />
         {/* SINGLE WORKSPACE DASHBOARD */}
         <Route
           path="/workspaces/:id"
@@ -78,14 +87,6 @@ function App() {
               </MainLayout>
             </ProtectedRoute>
           }
-        />
-        <Route
-          path="/workspaces/create"
-          element={<ProtectedRoute>
-              <MainLayout>
-                <CreateWorkspace />
-              </MainLayout>
-            </ProtectedRoute>}
         />
           <Route
   path="/dm"
@@ -184,6 +185,7 @@ function App() {
         </Routes>
       </BrowserRouter>
     </AuthProvider>
+    </ThemeProvider>
   );
 }
 

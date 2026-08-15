@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import api from "../api/axios";
+import toast from "react-hot-toast";
 import TAGS from "../constants/tags";
 import MentionInput from "../components/MentionInput";
 import {
@@ -24,22 +25,32 @@ const EditProject = () => {
   const [github, setGithub] = useState("");
   const [demo, setDemo] = useState("");
   const [loading, setLoading] = useState(false);
+  const [fetching, setFetching] = useState(true);
 
   useEffect(() => {
     const fetchProject = async () => {
-      const res = await api.get(`/projects/${id}`);
-      const p = res.data;
+      try {
+        setFetching(true);
+        const res = await api.get(`/projects/${id}`);
+        const p = res.data;
 
-      setTitle(p.title);
-      setDescription(p.description);
-      setMentions(p.mentions || []);
-      setTechStack(p.techStack || []);
-      setGithub(p.githubLink || "");
-      setDemo(p.liveDemoLink || "");
+        setTitle(p.title || "");
+        setDescription(p.description || "");
+        setMentions(p.mentions || []);
+        setTechStack(p.techStack || []);
+        setGithub(p.githubLink || "");
+        setDemo(p.liveDemoLink || "");
+      } catch (err) {
+        console.error("Failed to load project:", err);
+        toast.error("Failed to load project");
+        navigate("/");
+      } finally {
+        setFetching(false);
+      }
     };
 
     fetchProject();
-  }, [id]);
+  }, [id, navigate]);
 
   const addTag = (tag) => {
     if (techStack.includes(tag)) return;
@@ -60,22 +71,45 @@ const EditProject = () => {
   );
 
   const saveChanges = async () => {
-    if (!title || !description) return;
+    if (!title.trim()) {
+      toast.error("Project title is required");
+      return;
+    }
+    if (!description.trim()) {
+      toast.error("Project description is required");
+      return;
+    }
 
-    setLoading(true);
+    try {
+      setLoading(true);
 
-    await api.put(`/projects/${id}`, {
-      title,
-      description,
-      mentions: mentions.map((m) => m._id),
-      techStack,
-      githubLink: github,
-      liveDemoLink: demo
-    });
+      await api.put(`/projects/${id}`, {
+        title: title.trim(),
+        description: description.trim(),
+        mentions: mentions.map((m) => m._id),
+        techStack,
+        githubLink: github.trim(),
+        liveDemoLink: demo.trim()
+      });
 
-    setLoading(false);
-    navigate("/");
+      toast.success("Project updated successfully!");
+      navigate("/");
+    } catch (err) {
+      console.error("Failed to save project:", err);
+      const message = err.response?.data?.message || "Failed to save changes";
+      toast.error(message);
+    } finally {
+      setLoading(false);
+    }
   };
+
+  if (fetching) {
+    return (
+      <div className="flex items-center justify-center py-40">
+        <div className="w-8 h-8 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-2xl mx-auto bg-white border border-gray-100 rounded-3xl p-6 sm:p-8 shadow-lg">

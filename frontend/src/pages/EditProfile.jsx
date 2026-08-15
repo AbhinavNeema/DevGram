@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import api from "../api/axios";
-import { ArrowLeft, Save, Loader2, X, Camera } from "lucide-react";
+import toast from "react-hot-toast";
+import { ArrowLeft, Save, Loader2, X, Camera, User, Code2, Info, MapPin, Github } from "lucide-react";
 
 const EditProfile = () => {
   const { id } = useParams();
@@ -11,17 +12,20 @@ const EditProfile = () => {
   const [username, setUsername] = useState("");
   const [bio, setBio] = useState("");
   const [about, setAbout] = useState("");
+  const [location, setLocation] = useState("");
+  const [github, setGithub] = useState("");
   const [techStack, setTechStack] = useState([]);
   const [techInput, setTechInput] = useState("");
 
   const [profilePhoto, setProfilePhoto] = useState(null);
   const [preview, setPreview] = useState("");
-
   const [loading, setLoading] = useState(false);
+  const [fetching, setFetching] = useState(true);
 
   useEffect(() => {
     const loadProfile = async () => {
       try {
+        setFetching(true);
         const res = await api.get(`/users/${id}`);
         const u = res.data.user;
 
@@ -31,8 +35,13 @@ const EditProfile = () => {
         setAbout(u.about || "");
         setTechStack(u.techStack || []);
         setPreview(u.profilePhoto || "");
+        setLocation(u.location || "");
+        setGithub(u.github || "");
       } catch (err) {
         console.error("Failed to load profile", err);
+        toast.error("Failed to load profile");
+      } finally {
+        setFetching(false);
       }
     };
 
@@ -44,7 +53,7 @@ const EditProfile = () => {
     if (!file) return;
 
     if (file.size > 5 * 1024 * 1024) {
-      alert("Image must be less than 5MB");
+      toast.error("Image must be less than 5MB");
       return;
     }
 
@@ -54,10 +63,7 @@ const EditProfile = () => {
 
   const addTech = () => {
     const tech = techInput.trim();
-
-    if (!tech) return;
-    if (techStack.includes(tech)) return;
-
+    if (!tech || techStack.includes(tech)) return;
     setTechStack([...techStack, tech]);
     setTechInput("");
   };
@@ -71,9 +77,10 @@ const EditProfile = () => {
       setLoading(true);
 
       const formData = new FormData();
-
       formData.append("bio", bio);
       formData.append("about", about);
+      formData.append("location", location);
+      formData.append("github", github);
       formData.append("techStack", JSON.stringify(techStack));
 
       if (profilePhoto) {
@@ -86,177 +93,203 @@ const EditProfile = () => {
         },
       });
 
+      toast.success("Profile updated successfully!");
       navigate(`/user/${id}`);
     } catch (err) {
       console.error("Profile update failed", err);
+      const message = err.response?.data?.message || "Failed to update profile";
+      toast.error(message);
     } finally {
       setLoading(false);
     }
   };
 
-  return (
-    <div className="max-w-2xl mx-auto bg-white border border-gray-100 rounded-3xl p-6 sm:p-8 shadow-lg">
-
-      {/* HEADER */}
-      <div className="flex items-center justify-between mb-8">
-        <button
-          onClick={() => navigate(-1)}
-          className="flex items-center gap-2 text-sm font-medium text-slate-600 hover:text-indigo-600 transition"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          Back
-        </button>
-
-        <h2 className="text-xl font-bold text-slate-900">
-          Edit Profile
-        </h2>
+  if (fetching) {
+    return (
+      <div className="flex flex-col items-center justify-center py-32 gap-4">
+        <div className="w-16 h-16 relative">
+          <div className="absolute inset-0 rounded-full bg-gradient-to-r from-primary to-accent animate-ping opacity-20" />
+          <div className="relative w-16 h-16 rounded-full bg-gradient-to-r from-primary to-accent flex items-center justify-center shadow-lg shadow-indigo-500/25">
+            <Loader2 className="w-8 h-8 text-white animate-spin" />
+          </div>
+        </div>
+        <span className="text-sm text-slate-500 font-medium">Loading profile...</span>
       </div>
+    );
+  }
 
-      <div className="space-y-6">
+  return (
+    <div className="max-w-2xl mx-auto px-4 py-8">
+      {/* Back button */}
+      <button
+        onClick={() => navigate(-1)}
+        className="flex items-center gap-2 text-sm text-slate-500 hover:text-primary mb-6 transition"
+      >
+        <ArrowLeft className="w-4 h-4" />
+        Back
+      </button>
 
-        {/* PROFILE PHOTO */}
-        <div className="flex flex-col items-center gap-4">
+      <div className="relative bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl rounded-3xl border border-slate-200/50 dark:border-slate-700/50 shadow-xl overflow-hidden">
+        {/* Gradient header */}
+        <div className="h-32 sm:h-40 bg-gradient-to-br from-primary via-accent to-accent-2 relative overflow-hidden">
+          <div className="absolute inset-0 opacity-30">
+            <div className="absolute top-10 left-10 w-32 h-32 bg-white/20 rounded-full blur-3xl" />
+            <div className="absolute bottom-10 right-10 w-40 h-40 bg-white/20 rounded-full blur-3xl" />
+          </div>
+        </div>
 
-          <div className="relative">
+        <div className="relative px-6 sm:px-8 pb-8 -mt-16">
+          {/* Avatar */}
+          <div className="flex items-end gap-6 mb-8">
+            <div className="relative group">
+              <div className="w-28 h-28 rounded-3xl overflow-hidden border-4 border-white dark:border-slate-800 shadow-2xl bg-gradient-to-br from-primary to-accent flex items-center justify-center text-4xl font-bold text-white">
+                {preview ? (
+                  <img src={preview} alt="Profile" className="w-full h-full object-cover" />
+                ) : (
+                  name?.[0]?.toUpperCase() || "U"
+                )}
+              </div>
+              <label className="absolute -bottom-2 -right-2 w-10 h-10 bg-white dark:bg-slate-800 rounded-full flex items-center justify-center cursor-pointer shadow-lg border-2 border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 transition-all group-hover:scale-110">
+                <Camera className="w-5 h-5 text-slate-600 dark:text-slate-400" />
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handlePhotoChange}
+                  className="hidden"
+                />
+              </label>
+            </div>
+            <div className="pb-2">
+              <h2 className="text-2xl font-bold text-slate-900 dark:text-white">{name}</h2>
+              <p className="text-slate-500">@{username}</p>
+            </div>
+          </div>
 
-            <img
-              src={
-                preview
-                  ? preview.startsWith("blob:")
-                    ? preview
-                    : `${import.meta.env.VITE_BACKEND_URL || ""}${preview}`
-                  : `https://ui-avatars.com/api/?name=${name}&background=6366f1&color=fff`
-              }
-              alt="profile"
-              className="w-28 h-28 rounded-full object-cover border border-gray-200"
-            />
-
-            <label className="absolute bottom-0 right-0 bg-indigo-600 p-2 rounded-full cursor-pointer shadow hover:bg-indigo-500 transition">
-
-              <Camera className="w-4 h-4 text-white" />
-
+          <div className="space-y-6">
+            {/* Bio */}
+            <div>
+              <label className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2 flex items-center gap-2">
+                <User className="w-4 h-4 text-primary/70" />
+                Bio
+              </label>
               <input
-                type="file"
-                accept="image/*"
-                onChange={handlePhotoChange}
-                className="hidden"
+                value={bio}
+                onChange={(e) => setBio(e.target.value)}
+                placeholder="A short bio about yourself"
+                maxLength={150}
+                className="w-full bg-white/50 dark:bg-slate-800/50 border border-slate-200/50 dark:border-slate-700/50 rounded-xl px-4 py-3 text-sm text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all"
               />
+              <p className="text-xs text-slate-400 mt-1 text-right">{bio.length}/150</p>
+            </div>
 
-            </label>
+            {/* About */}
+            <div>
+              <label className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2 flex items-center gap-2">
+                <Info className="w-4 h-4 text-primary/70" />
+                About
+              </label>
+              <textarea
+                value={about}
+                onChange={(e) => setAbout(e.target.value)}
+                placeholder="Tell us more about yourself"
+                rows={4}
+                className="w-full bg-white/50 dark:bg-slate-800/50 border border-slate-200/50 dark:border-slate-700/50 rounded-xl px-4 py-3 text-sm text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all resize-none"
+              />
+            </div>
 
-          </div>
+            {/* Location & GitHub */}
+            <div className="grid sm:grid-cols-2 gap-4">
+              <div>
+                <label className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2 flex items-center gap-2">
+                  <MapPin className="w-4 h-4 text-slate-400" />
+                  Location
+                </label>
+                <input
+                  value={location}
+                  onChange={(e) => setLocation(e.target.value)}
+                  placeholder="San Francisco, CA"
+                  className="w-full bg-white/50 dark:bg-slate-800/50 border border-slate-200/50 dark:border-slate-700/50 rounded-xl px-4 py-3 text-sm text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all"
+                />
+              </div>
+              <div>
+                <label className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2 flex items-center gap-2">
+                  <Github className="w-4 h-4 text-slate-400" />
+                  GitHub
+                </label>
+                <input
+                  value={github}
+                  onChange={(e) => setGithub(e.target.value)}
+                  placeholder="https://github.com/username"
+                  className="w-full bg-white/50 dark:bg-slate-800/50 border border-slate-200/50 dark:border-slate-700/50 rounded-xl px-4 py-3 text-sm text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all"
+                />
+              </div>
+            </div>
 
-        </div>
+            {/* Tech Stack */}
+            <div>
+              <label className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2 flex items-center gap-2">
+                <Code2 className="w-4 h-4 text-primary/70" />
+                Tech Stack
+                <span className="text-xs text-slate-400 font-normal">({techStack.length}/15)</span>
+              </label>
 
-        {/* NAME (NOT EDITABLE) */}
-        <div>
-          <label className="text-sm font-semibold text-slate-700 mb-1 block">
-            Name
-          </label>
+              {techStack.length > 0 && (
+                <div className="flex flex-wrap gap-2 mb-3">
+                  {techStack.map((tech) => (
+                    <span
+                      key={tech}
+                      className="flex items-center gap-1.5 bg-gradient-to-r from-primary/10 to-accent/10 text-primary dark:from-primary/20 dark:to-accent/20 dark:text-primary px-3 py-1.5 rounded-full text-xs font-semibold border border-primary/20"
+                    >
+                      {tech}
+                      <button
+                        onClick={() => removeTech(tech)}
+                        className="hover:bg-primary/10 rounded-full p-0.5 transition"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
 
-          <input
-            value={name}
-            disabled
-            className="w-full border border-gray-200 bg-gray-50 rounded-xl px-4 py-3 text-sm text-gray-500"
-          />
-        </div>
-
-        {/* USERNAME (NOT EDITABLE) */}
-        <div>
-          <label className="text-sm font-semibold text-slate-700 mb-1 block">
-            Username
-          </label>
-
-          <input
-            value={username}
-            disabled
-            className="w-full border border-gray-200 bg-gray-50 rounded-xl px-4 py-3 text-sm text-gray-500"
-          />
-        </div>
-
-        {/* BIO */}
-        <div>
-          <label className="text-sm font-semibold text-slate-700 mb-1 block">
-            Bio
-          </label>
-
-          <input
-            value={bio}
-            onChange={(e) => setBio(e.target.value)}
-            className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-100"
-            placeholder="Short bio"
-          />
-        </div>
-
-        {/* ABOUT */}
-        <div>
-          <label className="text-sm font-semibold text-slate-700 mb-1 block">
-            About
-          </label>
-
-          <textarea
-            value={about}
-            onChange={(e) => setAbout(e.target.value)}
-            rows={4}
-            className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-100"
-            placeholder="Tell people about yourself"
-          />
-        </div>
-
-        {/* TECH STACK */}
-        <div>
-          <label className="text-sm font-semibold text-slate-700 mb-2 block">
-            Tech Stack
-          </label>
-
-          <div className="flex flex-wrap gap-2 mb-3">
-            {techStack.map((tech) => (
-              <span
-                key={tech}
-                className="flex items-center gap-2 bg-indigo-50 text-indigo-700 px-3 py-1 rounded-full text-xs font-semibold"
-              >
-                {tech}
-
-                <button onClick={() => removeTech(tech)}>
-                  <X className="w-3 h-3" />
+              <div className="flex gap-2">
+                <input
+                  value={techInput}
+                  onChange={(e) => setTechInput(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addTech())}
+                  placeholder="Add a technology (e.g., React)"
+                  className="flex-1 bg-white/50 dark:bg-slate-800/50 border border-slate-200/50 dark:border-slate-700/50 rounded-xl px-4 py-2.5 text-sm text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all"
+                />
+                <button
+                  onClick={addTech}
+                  disabled={!techInput.trim() || techStack.length >= 15}
+                  className="px-4 py-2.5 bg-gradient-to-r from-primary to-accent text-white rounded-xl font-semibold text-sm disabled:opacity-40 hover:shadow-lg hover:shadow-indigo-500/25 transition-all"
+                >
+                  Add
                 </button>
-              </span>
-            ))}
-          </div>
+              </div>
+            </div>
 
-          <div className="flex gap-2">
-            <input
-              value={techInput}
-              onChange={(e) => setTechInput(e.target.value)}
-              placeholder="Add technology"
-              className="flex-1 border border-gray-200 rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-100"
-            />
-
+            {/* Save Button */}
             <button
-              onClick={addTech}
-              className="bg-indigo-600 text-white px-4 rounded-xl text-sm hover:bg-indigo-500 transition"
+              onClick={saveProfile}
+              disabled={loading}
+              className="w-full relative overflow-hidden group bg-gradient-to-r from-primary via-accent to-accent-2 disabled:from-slate-300 disabled:to-slate-400 text-white py-4 rounded-xl font-bold flex items-center justify-center gap-2 transition-all shadow-lg hover:shadow-xl hover:shadow-indigo-500/25 disabled:shadow-none"
             >
-              Add
+              {loading ? (
+                <>
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                  <span>Saving...</span>
+                </>
+              ) : (
+                <>
+                  <Save className="w-5 h-5" />
+                  <span>Save Changes</span>
+                </>
+              )}
             </button>
           </div>
         </div>
-
-        {/* SAVE BUTTON */}
-        <button
-          onClick={saveProfile}
-          disabled={loading}
-          className="w-full bg-indigo-600 hover:bg-indigo-500 text-white py-3 rounded-xl font-semibold flex items-center justify-center gap-2 transition"
-        >
-          {loading ? (
-            <Loader2 className="w-5 h-5 animate-spin" />
-          ) : (
-            <>
-              <Save className="w-4 h-4" />
-              Save Profile
-            </>
-          )}
-        </button>
-
       </div>
     </div>
   );

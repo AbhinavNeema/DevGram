@@ -1,24 +1,31 @@
 import { useState } from "react";
 import api from "../../api/axios";
-import { Hash, Plus, Loader2, Layers } from "lucide-react";
+import toast from "react-hot-toast";
+import { Hash, Loader2, Layers } from "lucide-react";
 
 const ChannelManager = ({ workspaceId, channels = [], onCreated }) => {
   const [name, setName] = useState("");
   const [loading, setLoading] = useState(false);
 
   const createChannel = async () => {
-    if (!name.trim()) return;
+    if (!name.trim()) {
+      toast.error("Channel name is required");
+      return;
+    }
 
     try {
       setLoading(true);
       const res = await api.post(`/channels/${workspaceId}`, {
-        name,
+        name: name.trim(),
       });
 
       onCreated?.(res.data);
       setName("");
+      toast.success(`Channel #${res.data.name} created!`);
     } catch (err) {
-      console.error("Create channel failed", err);
+      console.error("Create channel failed:", err);
+      const message = err.response?.data?.message || "Failed to create channel";
+      toast.error(message);
     } finally {
       setLoading(false);
     }

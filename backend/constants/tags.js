@@ -17,7 +17,7 @@ module.exports = [
   "react-native","flutter","android","ios","swift","kotlin","expo","mobile-ui",
 
   "machine-learning","deep-learning","tensorflow","pytorch",
-  "scikit-learn","nlp","computer-vision","data-science","llm","chatbot",
+  "scikit-learn","nlp","computer-vision","data-science","llm","chatbot","ai",
 
   "dsa","algorithms","codeforces","leetcode","dynamic-programming","graphs",
 

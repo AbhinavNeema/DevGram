@@ -1,7 +1,8 @@
 import { useState } from "react";
 import api from "../../api/axios";
 import { useNavigate } from "react-router-dom";
-import { Settings, Save, Trash2 } from "lucide-react";
+import toast from "react-hot-toast";
+import { Settings, Save, Trash2, Loader2 } from "lucide-react";
 
 const WorkspaceSettings = ({ workspace, currentUserId }) => {
   const navigate = useNavigate();
@@ -12,10 +13,19 @@ const WorkspaceSettings = ({ workspace, currentUserId }) => {
   const [loading, setLoading] = useState(false);
 
   const saveChanges = async () => {
+    if (!name.trim()) {
+      toast.error("Workspace name is required");
+      return;
+    }
+
     try {
       setLoading(true);
       await api.put(`/workspaces/${workspace._id}`, { name, description });
-      alert("Workspace updated successfully");
+      toast.success("Workspace updated successfully");
+    } catch (err) {
+      console.error("Failed to save workspace:", err);
+      const message = err.response?.data?.message || "Failed to save changes";
+      toast.error(message);
     } finally {
       setLoading(false);
     }
@@ -24,8 +34,17 @@ const WorkspaceSettings = ({ workspace, currentUserId }) => {
   const deleteWorkspace = async () => {
     if (!window.confirm("Delete workspace permanently?")) return;
 
-    await api.delete(`/workspaces/${workspace._id}`);
-    navigate("/");
+    try {
+      setLoading(true);
+      await api.delete(`/workspaces/${workspace._id}`);
+      toast.success("Workspace deleted");
+      navigate("/");
+    } catch (err) {
+      console.error("Failed to delete workspace:", err);
+      const message = err.response?.data?.message || "Failed to delete workspace";
+      toast.error(message);
+      setLoading(false);
+    }
   };
 
   return (
@@ -81,9 +100,13 @@ const WorkspaceSettings = ({ workspace, currentUserId }) => {
           <button
             onClick={saveChanges}
             disabled={loading}
-            className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white px-6 py-3 rounded-lg font-semibold transition"
+            className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white px-6 py-3 rounded-lg font-semibold transition disabled:bg-indigo-400 disabled:cursor-not-allowed"
           >
-            <Save className="w-4 h-4" />
+            {loading ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <Save className="w-4 h-4" />
+            )}
             {loading ? "Saving..." : "Save Changes"}
           </button>
 

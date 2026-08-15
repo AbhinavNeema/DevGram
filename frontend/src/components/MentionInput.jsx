@@ -1,52 +1,74 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import api from "../api/axios";
-import { User, AtSign, Search, Zap } from "lucide-react";
+import { User, AtSign, Zap, Search } from "lucide-react";
 
 const MentionInput = ({
   value,
   onChange,
   onMentionsChange,
   placeholder = "Write a comment... @user",
-  rows = 1
+  rows = 1,
+  className = "",
 }) => {
   const [query, setQuery] = useState("");
   const [suggestions, setSuggestions] = useState([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [showDropdown, setShowDropdown] = useState(false);
   const ref = useRef(null);
   const boxRef = useRef(null);
-  const debounceRef = useRef(null);
+  const abortRef = useRef(null);
 
-  /* 🔹 Debounced fetch for suggestions (lightweight) 🔹 */
-  useEffect(() => {
-  if (!query) {
-    setSuggestions([]);
-    return;
-  }
+  /* Debounced fetch with request cancellation */
+  const fetchSuggestions = useCallback(async (searchQuery) => {
+    if (!searchQuery || searchQuery.length < 1) {
+      setSuggestions([]);
+      return;
+    }
 
-  if (debounceRef.current) clearTimeout(debounceRef.current);
+    if (abortRef.current) {
+      abortRef.current.abort();
+    }
+    abortRef.current = new AbortController();
 
-  debounceRef.current = setTimeout(async () => {
     try {
+      setIsLoading(true);
       const res = await api.get(
-        `/users/search?q=${encodeURIComponent(query)}`
+        `/users/search?q=${encodeURIComponent(searchQuery)}`,
+        { signal: abortRef.current.signal }
       );
 
       setSuggestions(Array.isArray(res.data) ? res.data : []);
     } catch (err) {
+      if (err.name === "CanceledError" || err?.code === "ERR_CANCELED") {
+        return;
+      }
       console.error("Mention search failed", err);
       setSuggestions([]);
+    } finally {
+      setIsLoading(false);
     }
-  }, 220);
+  }, []);
 
-  return () => {
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-  };
-}, [query]);
+  /* Debounce the fetch */
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      fetchSuggestions(query);
+    }, 200);
+
+    return () => {
+      clearTimeout(timer);
+      if (abortRef.current) {
+        abortRef.current.abort();
+      }
+    };
+  }, [query, fetchSuggestions]);
 
   useEffect(() => {
     const handleClickOutside = (e) => {
       if (boxRef.current && !boxRef.current.contains(e.target)) {
         setSuggestions([]);
         setQuery("");
+        setShowDropdown(false);
       }
     };
 
@@ -62,7 +84,13 @@ const MentionInput = ({
     const before = text.slice(0, cursor);
     const match = before.match(/@([a-z0-9_.]{1,30})$/i);
 
-    setQuery(match ? match[1] : "");
+    if (match) {
+      setQuery(match[1]);
+      setShowDropdown(true);
+    } else {
+      setQuery("");
+      setShowDropdown(false);
+    }
   };
 
   const selectUser = (user) => {
@@ -78,64 +106,99 @@ const MentionInput = ({
 
     setQuery("");
     setSuggestions([]);
+    setShowDropdown(false);
     setTimeout(() => ref.current.focus(), 0);
   };
 
   return (
-    <div ref={boxRef} className="relative w-full group">
-      {/* compact single-line textarea container (light theme) */}
-      <div className="relative overflow-hidden rounded-lg border border-gray-200 bg-white transition-all duration-150 focus-within:ring-1 focus-within:ring-indigo-100">
+    <div ref={boxRef} className={`relative w-full group ${className}`}>
+      {/* Input container with glassmorphism */}
+      <div className="relative overflow-hidden bg-transparent transition-all duration-150">
         <textarea
           ref={ref}
           value={value}
           rows={rows}
           onChange={handleChange}
           placeholder={placeholder}
-          className="w-full bg-transparent px-3 py-2 text-sm text-slate-800 placeholder:text-slate-400 outline-none transition-all resize-none font-medium leading-tight"
+          className="w-full bg-transparent px-3 py-2 text-sm text-slate-900 dark:text-white placeholder:text-slate-400 outline-none transition-all resize-none leading-relaxed"
         />
 
-        {/* subtle at-sign indicator */}
-        <div className="absolute bottom-1.5 right-3 pointer-events-none opacity-30 transition-opacity">
-          <AtSign className="w-3.5 h-3.5 text-indigo-400" />
-        </div>
+        {/* At-sign indicator */}
+        {value === "" && (
+          <div className="absolute bottom-2 right-3 pointer-events-none opacity-40">
+            <AtSign className="w-4 h-4 text-primary" />
+          </div>
+        )}
       </div>
 
-      {/* suggestions dropdown - compact, light, and non-obtrusive */}
-      {suggestions.length > 0 && (
-        <div className="absolute bottom-full left-0 z-50 mb-2 w-full max-h-48 overflow-y-auto rounded-lg border border-gray-200 bg-white p-1 shadow-lg custom-scrollbar">
-          <div className="px-2 py-1 mb-1 border-b border-gray-100 flex items-center justify-between">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-600">Matches</span>
-            <Zap className="w-3 h-3 text-indigo-500" />
+      {/* Suggestions dropdown */}
+      {showDropdown && (suggestions.length > 0 || isLoading) && (
+        <div className="absolute bottom-full left-0 z-50 mb-2 w-72 max-h-64 overflow-y-auto bg-white/95 dark:bg-slate-800/95 backdrop-blur-xl rounded-2xl border border-slate-200/50 dark:border-slate-700/50 shadow-xl shadow-indigo-500/10">
+          {/* Header */}
+          <div className="px-3 py-2 border-b border-slate-200/50 dark:border-slate-700/50 flex items-center justify-between sticky top-0 bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-primary flex items-center gap-1.5">
+              <Search className="w-3 h-3" />
+              Mention
+            </span>
+            <Zap className="w-3 h-3 text-primary/60" />
           </div>
 
-          <div className="space-y-1 px-1">
-            {suggestions.map((u) => (
-              <div
-                key={u._id}
-                onClick={() => selectUser(u)}
-                className="group flex items-center gap-3 px-2 py-2 rounded-md cursor-pointer hover:bg-indigo-50 transition-colors"
-              >
-                <div className="w-8 h-8 rounded-md bg-indigo-50 flex items-center justify-center text-[12px] font-bold text-indigo-700 flex-shrink-0 border border-indigo-100">
-                  {u.name?.[0]?.toUpperCase() || u.username?.[0]?.toUpperCase() || <User className="w-4 h-4" />}
-                </div>
+          {/* Loading state */}
+          {isLoading && (
+            <div className="px-3 py-4 flex items-center justify-center">
+              <div className="w-5 h-5 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
+            </div>
+          )}
 
-                <div className="flex flex-col">
-                  <span className="text-sm font-semibold text-slate-900">@{u.username}</span>
-                  <span className="text-[11px] text-slate-500">{u.name || "No name"}</span>
-                </div>
+          {/* Suggestions list */}
+          {!isLoading && suggestions.length > 0 && (
+            <div className="p-1.5">
+              {suggestions.map((u) => (
+                <div
+                  key={u._id}
+                  onClick={() => selectUser(u)}
+                  className="group flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer hover:bg-gradient-to-r hover:from-primary/10 hover:to-accent/10 transition-all"
+                >
+                  <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center text-sm font-bold text-primary flex-shrink-0">
+                    {u.profilePhoto ? (
+                      <img src={u.profilePhoto} alt={u.name} className="w-full h-full object-cover rounded-xl" />
+                    ) : (
+                      u.name?.[0]?.toUpperCase() || u.username?.[0]?.toUpperCase()
+                    )}
+                  </div>
 
-                <div className="ml-auto opacity-0 group-hover:opacity-100 transition-opacity">
-                  <div className="bg-indigo-600 text-white text-[11px] px-2 py-0.5 rounded">Tag</div>
+                  <div className="flex flex-col min-w-0 flex-1">
+                    <span className="text-sm font-semibold text-slate-900 dark:text-white group-hover:text-primary transition-colors">
+                      @{u.username}
+                    </span>
+                    <span className="text-xs text-slate-500 truncate">
+                      {u.name || "No name"}
+                    </span>
+                  </div>
+
+                  <div className="opacity-0 group-hover:opacity-100 transition-opacity">
+                    <div className="bg-gradient-to-r from-primary to-accent text-white text-[10px] px-2 py-1 rounded-lg font-semibold">
+                      Tag
+                    </div>
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
+
+          {/* No results */}
+          {!isLoading && suggestions.length === 0 && query && (
+            <div className="px-3 py-4 text-center text-xs text-slate-400">
+              No users found for "@{query}"
+            </div>
+          )}
         </div>
       )}
 
       <style>{`
         .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(15,23,42,0.08); border-radius: 8px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(99,102,241,0.2); border-radius: 8px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(99,102,241,0.4); }
       `}</style>
     </div>
   );

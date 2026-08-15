@@ -14,6 +14,7 @@ const {
 
 router.get("/", auth, getAllUsers);
 router.get("/search", auth, searchUsers);
+router.get("/username/:username", auth, getUserByUsername);
 router.get("/:id", auth, getUserProfile);
 
 router.put(
@@ -24,7 +25,5 @@ router.put(
 );
 
 router.put("/:id/follow", auth, toggleFollow);
-
-router.get("/username/:username", getUserByUsername);
 
 module.exports = router;

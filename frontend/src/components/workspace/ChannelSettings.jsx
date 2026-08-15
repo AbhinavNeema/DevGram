@@ -1,34 +1,73 @@
 import { useState } from "react";
 import api from "../../api/axios";
+import toast from "react-hot-toast";
+import { useNavigate } from "react-router-dom";
 import { X, Settings, UserPlus, UserMinus, Trash2, Info, Save, ShieldAlert, Loader2 } from "lucide-react";
 
 const ChannelSettings = ({ channel, workspace, onClose }) => {
+  const navigate = useNavigate();
   const [name, setName] = useState(channel.name);
   const [description, setDescription] = useState(channel.description || "");
   const [channelMembers, setChannelMembers] = useState(channel.members || []);
   const [saving, setSaving] = useState(false);
 
-  // Logic remains 100% identical
   const save = async () => {
-    setSaving(true);
-    await api.put(`/channels/${channel._id}`, { name, description });
-    setSaving(false);
-    onClose();
+    if (!name.trim()) {
+      toast.error("Channel name is required");
+      return;
+    }
+
+    try {
+      setSaving(true);
+      await api.put(`/channels/${channel._id}`, { name: name.trim(), description });
+      toast.success("Channel settings updated");
+      onClose();
+    } catch (err) {
+      console.error("Failed to save channel:", err);
+      const message = err.response?.data?.message || "Failed to save changes";
+      toast.error(message);
+    } finally {
+      setSaving(false);
+    }
   };
 
   const addMember = async (userId) => {
-    await api.post(`/channels/${channel._id}/members`, { userId });
-    setChannelMembers(prev => [...prev, userId]);
+    try {
+      await api.post(`/channels/${channel._id}/members`, { userId });
+      setChannelMembers(prev => [...prev, userId]);
+      toast.success("Member added");
+    } catch (err) {
+      console.error("Failed to add member:", err);
+      const message = err.response?.data?.message || "Failed to add member";
+      toast.error(message);
+    }
   };
 
   const removeMember = async (userId) => {
-    await api.delete(`/channels/${channel._id}/members/${userId}`);
-    setChannelMembers(prev => prev.filter(id => String(id) !== String(userId)));
+    try {
+      await api.delete(`/channels/${channel._id}/members/${userId}`);
+      setChannelMembers(prev => prev.filter(id => String(id) !== String(userId)));
+      toast.success("Member removed");
+    } catch (err) {
+      console.error("Failed to remove member:", err);
+      const message = err.response?.data?.message || "Failed to remove member";
+      toast.error(message);
+    }
   };
 
   const deleteChannel = async () => {
     if (!confirm("Are you sure? This action is permanent.")) return;
-    await api.delete(`/channels/${channel._id}`);
+
+    try {
+      await api.delete(`/channels/${channel._id}`);
+      toast.success("Channel deleted");
+      onClose();
+      navigate(`/workspaces/${workspace._id}`);
+    } catch (err) {
+      console.error("Failed to delete channel:", err);
+      const message = err.response?.data?.message || "Failed to delete channel";
+      toast.error(message);
+    }
   };
 
   return (

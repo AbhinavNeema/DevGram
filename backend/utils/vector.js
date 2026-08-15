@@ -18,6 +18,11 @@ exports.updateUserEmbedding = (
 
   const decay = 0.95;
 
+  // Dimension mismatch guard
+  if (userEmbedding.length !== contentEmbedding.length) {
+    return userEmbedding;
+  }
+
   // If user has no embedding yet
   if (!userEmbedding || userEmbedding.length === 0) {
     return normalize(
@@ -36,6 +41,8 @@ exports.updateUserEmbedding = (
 exports.cosineSimilarity = (vecA, vecB) => {
   if (!vecA || !vecB || vecA.length === 0 || vecB.length === 0)
     return 0;
+
+  if (vecA.length !== vecB.length) return 0;
 
   let dot = 0;
   let normA = 0;
