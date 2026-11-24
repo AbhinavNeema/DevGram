@@ -1,5 +1,8 @@
 const { Server } = require("socket.io");
-const ChannelMessage = require("./models/ChannelMessage"); // for DM only
+const jwt = require("jsonwebtoken");
+const Message = require("./models/Message");
+const Conversation = require("./models/Conversation");
+const Channel = require("./models/Channel");
 
 let io;
 
@@ -14,44 +17,92 @@ const initSocket = (server) => {
     },
   });
 
-  io.on("connection", socket => {
+  // 🔐 Socket authentication middleware
+  io.use((socket, next) => {
+    const token = socket.handshake.auth?.token;
+    if (!token) {
+      return next(new Error("Authentication required"));
+    }
+    try {
+      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      socket.userId = decoded.sub;
+      next();
+    } catch (err) {
+      return next(new Error("Invalid token"));
+    }
+  });
 
+  io.on("connection", (socket) => {
     // ================= DM =================
-    socket.on("joinConversation", conversationId => {
-      socket.join(conversationId);
+    socket.on("joinConversation", async (conversationId) => {
+      try {
+        const conversation = await Conversation.findById(conversationId);
+        if (!conversation) return;
+        const isParticipant = conversation.participants.some(
+          (p) => p.toString() === socket.userId
+        );
+        if (!isParticipant) return;
+        socket.join(conversationId);
+      } catch (err) {
+        console.error("joinConversation error:", err);
+      }
     });
 
-    // 🔥 DM MESSAGE (socket owns DM)
-    socket.on("sendDMMessage", async ({ conversationId, senderId, content }) => {
+    socket.on("leaveConversation", (conversationId) => {
+      socket.leave(conversationId);
+    });
+
+    // 🔥 DM MESSAGE
+    socket.on("sendDMMessage", async ({ conversationId, content }) => {
       try {
         if (!content || !content.trim()) return;
 
-        const message = await ChannelMessage.create({
+        // Verify participation
+        const conversation = await Conversation.findById(conversationId);
+        if (!conversation) return;
+        const isParticipant = conversation.participants.some(
+          (p) => p.toString() === socket.userId
+        );
+        if (!isParticipant) return;
+
+        const message = await Message.create({
           conversation: conversationId,
-          sender: senderId,
+          sender: socket.userId,
           type: "text",
           content: content.trim(),
         });
 
+        // Update lastMessage on conversation
+        await Conversation.findByIdAndUpdate(conversationId, {
+          lastMessage: message._id,
+        });
+
         const populated = await message.populate("sender", "name _id");
 
-        io.to(conversationId).emit("newDMMessage", populated);
+        io.to(conversationId).emit("newMessage", populated);
       } catch (err) {
         console.error("Send DM error:", err);
       }
     });
 
     // ================= CHANNEL =================
-    socket.on("joinChannel", channelId => {
-      socket.join(channelId);
+    socket.on("joinChannel", async (channelId) => {
+      try {
+        const channel = await Channel.findById(channelId);
+        if (!channel) return;
+        const isMember = channel.members.some(
+          (m) => m.toString() === socket.userId
+        );
+        if (!isMember) return;
+        socket.join(channelId);
+      } catch (err) {
+        console.error("joinChannel error:", err);
+      }
     });
 
-    socket.on("leaveChannel", channelId => {
+    socket.on("leaveChannel", (channelId) => {
       socket.leave(channelId);
     });
-
-    // ❌ DO NOT CREATE CHANNEL MESSAGES HERE
-    // Channel messages come from controllers via getIO().emit()
 
     socket.on("disconnect", () => {});
   });

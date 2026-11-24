@@ -2,73 +2,126 @@ const Conversation = require("../models/Conversation");
 const cloudinary = require("../utils/cloudinary");
 const Message = require("../models/Message");
 const { getIO } = require("../socket");
-// exports.sendMessage = async (req, res) => {
-//   const { conversationId, text } = req.body;
+const mongoose = require("mongoose");
 
-//   const message = await Message.create({
-//     conversation: conversationId,
-//     sender: req.user.id,
-//     text,
-//   });
-
-//   await message.populate("sender", "name");
-
-//   // 🔥 REAL-TIME EMIT
-//   getIO()
-//     .to(conversationId)
-//     .emit("newMessage", message);
-
-//   res.json(message);
-// };
 /* START OR GET CONVERSATION */
 exports.startConversation = async (req, res) => {
-  const userId = req.userId;
-  const otherUserId = req.params.userId;
+  try {
+    const userId = req.userId;
+    const otherUserId = req.params.userId;
 
-  if (userId === otherUserId) {
-    return res.status(400).json({ message: "Cannot DM yourself" });
+    if (userId === otherUserId) {
+      return res.status(400).json({ message: "Cannot DM yourself" });
+    }
+
+    const participants = [userId, otherUserId]
+      .map((id) => id.toString())
+      .sort();
+    const pairKey = participants.join("_");
+
+    let conversation = await Conversation.findOne({ pairKey }).populate(
+      "participants",
+      "name"
+    );
+
+    if (!conversation) {
+      try {
+        conversation = await Conversation.create({ participants, pairKey });
+        await conversation.populate("participants", "name");
+      } catch (createErr) {
+        if (createErr.code === 11000) {
+          conversation = await Conversation.findOne({ pairKey }).populate(
+            "participants",
+            "name"
+          );
+        } else {
+          throw createErr;
+        }
+      }
+    }
+
+    res.json(conversation);
+  } catch (err) {
+    console.error("startConversation error:", err);
+    res.status(500).json({ message: "Server error" });
   }
-
-  // 🔑 ALWAYS SORT
-  const participants = [userId, otherUserId]
-    .map(id => id.toString())
-    .sort();
-
-  let conversation = await Conversation.findOne({
-    participants,
-  }).populate("participants", "name");
-
-  if (!conversation) {
-    conversation = await Conversation.create({ participants });
-    await conversation.populate("participants", "name");
-  }
-
-  res.json(conversation);
 };
+
 /* GET INBOX */
 exports.getInbox = async (req, res) => {
-  const userId = req.userId;
+  try {
+    const userId = req.userId;
+    const userObjectId = new mongoose.Types.ObjectId(userId);
 
-  const conversations = await Conversation.find({
-    participants: userId,
-  })
-    .populate("participants", "name")
-    .populate("lastMessage")
-    .sort({ updatedAt: -1 });
+    const conversations = await Conversation.find({
+      participants: userId,
+    })
+      .populate("participants", "name")
+      .populate("lastMessage")
+      .sort({ updatedAt: -1 });
 
-  res.json(conversations);
+    const conversationIds = conversations.map((c) => c._id);
+
+    const unreadCounts = await Message.aggregate([
+      {
+        $match: {
+          conversation: { $in: conversationIds },
+          readBy: { $ne: userObjectId },
+          sender: { $ne: userObjectId },
+        },
+      },
+      {
+        $group: {
+          _id: "$conversation",
+          count: { $sum: 1 },
+        },
+      },
+    ]);
+
+    const unreadMap = {};
+    unreadCounts.forEach((item) => {
+      unreadMap[item._id.toString()] = item.count;
+    });
+
+    const data = conversations.map((conv) => {
+      const unreadCount = unreadMap[conv._id.toString()] || 0;
+      return { ...conv.toObject(), unreadCount };
+    });
+
+    res.json(data);
+  } catch (err) {
+    console.error("getInbox error:", err);
+    res.status(500).json({ message: "Server error" });
+  }
 };
 
-/* GET MESSAGES */
+/* GET MESSAGES — with participant check */
 exports.getMessages = async (req, res) => {
-  const messages = await Message.find({
-    conversation: req.params.conversationId,
-  }).populate("sender", "name");
+  try {
+    const conversation = await Conversation.findById(req.params.conversationId);
+    if (!conversation) {
+      return res.status(404).json({ message: "Conversation not found" });
+    }
 
-  res.json(messages);
+    const isParticipant = conversation.participants.some(
+      (p) => p.toString() === req.userId
+    );
+    if (!isParticipant) {
+      return res.status(403).json({ message: "Access denied" });
+    }
+
+    const messages = await Message.find({
+      conversation: req.params.conversationId,
+    }).populate("sender", "name");
+
+    res.json(messages);
+  } catch (err) {
+    console.error("getMessages error:", err);
+    res.status(500).json({ message: "Server error" });
+  }
 };
 
-
+/* SEND MESSAGE — with participant check + lastMessage update */
 exports.sendMessage = async (req, res) => {
   try {
     const { conversationId, content, type = "text" } = req.body;
@@ -78,18 +131,35 @@ exports.sendMessage = async (req, res) => {
       return res.status(400).json({ message: "Message content required" });
     }
 
+    const conversation = await Conversation.findById(conversationId);
+    if (!conversation) {
+      return res.status(404).json({ message: "Conversation not found" });
+    }
+
+    const isParticipant = conversation.participants.some(
+      (p) => p.toString() === senderId
+    );
+    if (!isParticipant) {
+      return res.status(403).json({ message: "Access denied" });
+    }
+
     const message = await Message.create({
       conversation: conversationId,
       sender: senderId,
-      content: content.trim(),   // ✅ FORCE TRIM
+      content: content.trim(),
       type,
     });
 
-    // 🔥 IMPORTANT: populate BEFORE emitting
-    const populatedMessage = await Message.findById(message._id)
-      .populate("sender", "name _id");
+    // Update lastMessage
+    await Conversation.findByIdAndUpdate(conversationId, {
+      lastMessage: message._id,
+    });
 
-    
+    const populatedMessage = await Message.findById(message._id).populate(
+      "sender",
+      "name _id"
+    );
+
     const io = getIO();
     io.to(conversationId).emit("newMessage", populatedMessage);
 
@@ -100,59 +170,46 @@ exports.sendMessage = async (req, res) => {
   }
 };
 
-// controllers/messageController.js
+/* MARK AS READ */
 exports.markAsRead = async (req, res) => {
-  const { conversationId } = req.params;
+  try {
+    const { conversationId } = req.params;
 
-  await Message.updateMany(
-    {
-      conversation: conversationId,
-      readBy: { $ne: req.userId },
-    },
-    {
-      $push: { readBy: req.userId },
+    const conversation = await Conversation.findById(conversationId);
+    if (!conversation) {
+      return res.status(404).json({ message: "Conversation not found" });
     }
-  );
 
-  res.json({ success: true });
+    const isParticipant = conversation.participants.some(
+      (p) => p.toString() === req.userId
+    );
+    if (!isParticipant) {
+      return res.status(403).json({ message: "Access denied" });
+    }
+
+    await Message.updateMany(
+      {
+        conversation: conversationId,
+        readBy: { $ne: req.userId },
+      },
+      {
+        $push: { readBy: req.userId },
+      }
+    );
+
+    getIO().to(conversationId).emit("messagesRead", {
+      conversationId,
+      userId: req.userId,
+    });
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error("markAsRead error:", err);
+    res.status(500).json({ message: "Server error" });
+  }
 };
 
-exports.getInbox = async (req, res) => {
-  const userId = req.userId;
-
-  const conversations = await Conversation.find({
-    participants: userId,
-  })
-    .populate("participants", "name")
-    .populate("lastMessage")
-    .sort({ updatedAt: -1 });
-
-  const data = await Promise.all(
-    conversations.map(async conv => {
-      const unreadCount = await Message.countDocuments({
-        conversation: conv._id,
-        readBy: { $ne: userId },
-        sender: { $ne: userId },
-      });
-
-      return { ...conv.toObject(), unreadCount };
-    })
-  );
-
-  res.json(data);
-};
-
-exports.deleteMessage = async (req, res) => {
-  const msg = await Message.findById(req.params.id);
-  await msg.deleteOne();
-
-  getIO().to(msg.conversation.toString()).emit("deleteMessage", msg._id);
-
-  res.json({ success: true });
-};
-
-const mongoose = require("mongoose");
-
+/* EDIT MESSAGE — with ownership check */
 exports.editMessage = async (req, res) => {
   try {
     const { content } = req.body;
@@ -162,31 +219,34 @@ exports.editMessage = async (req, res) => {
       return res.status(400).json({ message: "Message content required" });
     }
 
-    // ✅ Prevent crash if optimistic clientId is sent
     if (!mongoose.Types.ObjectId.isValid(messageId)) {
       return res.status(400).json({ message: "Invalid message id" });
     }
 
-    const msg = await Message.findByIdAndUpdate(
-      messageId,
-      { content: content.trim() },
-      { new: true }
-    ).populate("sender", "name _id");
-
+    const msg = await Message.findById(messageId);
     if (!msg) {
       return res.status(404).json({ message: "Message not found" });
     }
 
-    // realtime update
+    // Ownership check
+    if (msg.sender.toString() !== req.userId) {
+      return res.status(403).json({ message: "Not allowed" });
+    }
+
+    msg.content = content.trim();
+    await msg.save();
+    await msg.populate("sender", "name _id");
+
     getIO().to(msg.conversation.toString()).emit("editMessage", msg);
 
     res.json(msg);
-
   } catch (err) {
     console.error("Edit message error:", err);
     res.status(500).json({ message: "Failed to edit message" });
   }
 };
+
+/* SEND DM IMAGE — with participant check + lastMessage update */
 exports.sendDMImage = async (req, res) => {
   try {
     const senderId = req.userId;
@@ -196,12 +256,29 @@ exports.sendDMImage = async (req, res) => {
       return res.status(400).json({ message: "No image uploaded" });
     }
 
+    const conversation = await Conversation.findById(conversationId);
+    if (!conversation) {
+      return res.status(404).json({ message: "Conversation not found" });
+    }
+
+    const isParticipant = conversation.participants.some(
+      (p) => p.toString() === senderId
+    );
+    if (!isParticipant) {
+      return res.status(403).json({ message: "Access denied" });
+    }
+
     const message = await Message.create({
       sender: senderId,
       conversation: conversationId,
       type: "image",
-      content: req.file.path,              // ✅ cloud url
-      cloudinaryId: req.file.filename,     // ✅ public_id
+      content: req.file.path,
+      cloudinaryId: req.file.filename,
+    });
+
+    // Update lastMessage
+    await Conversation.findByIdAndUpdate(conversationId, {
+      lastMessage: message._id,
     });
 
     const populated = await message.populate("sender", "name _id");
@@ -215,19 +292,49 @@ exports.sendDMImage = async (req, res) => {
   }
 };
 
+/* DELETE MESSAGE — with ownership check + cloudinary cleanup */
 exports.deleteMessage = async (req, res) => {
-  const msg = await Message.findById(req.params.id);
+  try {
+    const msg = await Message.findById(req.params.id);
 
-  if (!msg) return res.status(404).json({ message: "Not found" });
+    if (!msg) return res.status(404).json({ message: "Not found" });
 
-  // 🔥 delete image from cloud
-  if (msg.type === "image" && msg.cloudinaryId) {
-    await cloudinary.uploader.destroy(msg.cloudinaryId);
+    // Ownership check
+    if (msg.sender.toString() !== req.userId) {
+      return res.status(403).json({ message: "Not allowed" });
+    }
+
+    // Delete image from cloud
+    if (msg.type === "image" && msg.cloudinaryId) {
+      try {
+        await cloudinary.uploader.destroy(msg.cloudinaryId);
+      } catch (err) {
+        console.warn("Cloudinary delete failed (ignored):", err.message);
+      }
+    }
+
+    const conversationId = msg.conversation;
+    await msg.deleteOne();
+
+    // Check if the deleted message was the conversation's lastMessage
+    const conversation = await Conversation.findById(conversationId);
+    if (
+      conversation &&
+      conversation.lastMessage &&
+      conversation.lastMessage.toString() === msg._id.toString()
+    ) {
+      const latestMsg = await Message.findOne({ conversation: conversationId }).sort({
+        createdAt: -1,
+      });
+      conversation.lastMessage = latestMsg ? latestMsg._id : null;
+      await conversation.save();
+    }
+
+    getIO().to(conversationId.toString()).emit("deleteMessage", msg._id);
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error("deleteMessage error:", err);
+    res.status(500).json({ message: "Server error" });
   }
-
-  await msg.deleteOne();
-
-  getIO().to(msg.conversation.toString()).emit("deleteMessage", msg._id);
-
-  res.json({ success: true });
 };

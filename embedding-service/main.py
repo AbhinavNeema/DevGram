@@ -1,37 +1,38 @@
-from fastapi import FastAPI
-from pydantic import BaseModel
+from contextlib import asynccontextmanager
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel, Field
 from sentence_transformers import SentenceTransformer
-import os
 
-app = FastAPI()
+model = None
 
-print("🚀 Loading MiniLM model...")
-model = SentenceTransformer("sentence-transformers/paraphrase-MiniLM-L3-v2")
-print("✅ Model loaded.")
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    global model
+    try:
+        model = SentenceTransformer("paraphrase-MiniLM-L3-v2")
+        print("Model loaded successfully")
+    except Exception as e:
+        print(f"Failed to load model: {e}")
+        raise
+    yield
+
+app = FastAPI(lifespan=lifespan)
 
 class EmbedRequest(BaseModel):
-    text: str
-
-
-@app.get("/")
-def root():
-    return {"message": "Embedding service running"}
-
+    text: str = Field(..., max_length=10000)
 
 @app.get("/health")
 def health():
+    if model is None:
+        raise HTTPException(status_code=503, detail="Model not loaded")
     return {"status": "ok"}
 
-
 @app.post("/embed")
-async def embed(req: EmbedRequest):
+def embed(req: EmbedRequest):
+    if model is None:
+        raise HTTPException(status_code=503, detail="Model not loaded")
     try:
-        embedding = model.encode(
-            req.text,
-            normalize_embeddings=True
-        )
-        return {
-            "embedding": embedding.tolist()
-        }
-    except Exception as e:
-        return {"error": str(e)}
+        embedding = model.encode(req.text).tolist()
+        return {"embedding": embedding}
+    except Exception:
+        raise HTTPException(status_code=500, detail="Embedding generation failed")

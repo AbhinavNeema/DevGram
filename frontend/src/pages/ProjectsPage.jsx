@@ -1,39 +1,52 @@
-import { useEffect, useRef, useState, useCallback, useMemo } from "react";
-import { useSearchParams } from "react-router-dom";
-import api from "../api/axios";
-import ProjectCard from "../components/ProjectCard";
-import BlogCard from "../components/BlogCard";
-import { Layers, Zap, Terminal, Loader2, Activity, Plus } from "lucide-react";
+import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
+import { useSearchParams, Link } from 'react-router-dom';
+import api from '../api/axios';
+import ProjectCard from '../components/ProjectCard';
+import BlogCard from '../components/BlogCard';
+import {
+  Layers,
+  Terminal,
+  Loader2,
+  Activity,
+  X,
+  Code2,
+  Sparkles,
+  Plus,
+} from 'lucide-react';
 
-const SkeletonItem = ({ idx = 0 }) => (
+const SkeletonFeedItem = ({ idx = 0 }) => (
   <div
-    className="animate-pulse bg-white rounded-3xl border border-gray-100 shadow-sm p-5"
-    style={{ animationDelay: `${idx * 60}ms` }}
+    className="animate-pulse bg-white/[0.03] backdrop-blur-xl border border-white/[0.06] rounded-2xl p-6 mb-6"
+    style={{ animationDelay: `${idx * 80}ms` }}
   >
-    <div className="flex items-center gap-4 mb-4">
-      <div className="w-12 h-12 rounded-2xl bg-gray-100" />
-      <div className="flex-1">
-        <div className="h-4 bg-gray-100 rounded w-3/5 mb-2" />
-        <div className="h-3 bg-gray-100 rounded w-1/3" />
+    {/* Author Header */}
+    <div className="flex items-center gap-3.5 mb-4">
+      <div className="w-11 h-11 rounded-full bg-white/[0.08]" />
+      <div className="flex-1 space-y-2">
+        <div className="h-4 bg-white/[0.08] rounded-md w-1/3" />
+        <div className="h-3 bg-white/[0.05] rounded-md w-1/4" />
       </div>
-      <div className="w-20 h-8 bg-gray-100 rounded" />
+      <div className="w-16 h-7 bg-white/[0.05] rounded-xl" />
     </div>
 
-    <div className="space-y-3">
-      <div className="h-3 bg-gray-100 rounded w-full" />
-      <div className="h-3 bg-gray-100 rounded w-11/12" />
-      <div className="h-40 bg-gray-100 rounded-md" />
+    {/* Content Skeleton */}
+    <div className="space-y-3 mb-5">
+      <div className="h-5 bg-white/[0.08] rounded-md w-3/4" />
+      <div className="h-3.5 bg-white/[0.05] rounded-md w-full" />
+      <div className="h-3.5 bg-white/[0.05] rounded-md w-5/6" />
+      <div className="h-48 bg-white/[0.04] rounded-xl w-full mt-2" />
     </div>
 
-    <div className="mt-4 flex items-center gap-4">
-      <div className="h-8 w-20 bg-gray-100 rounded-full" />
-      <div className="h-8 w-10 bg-gray-100 rounded-full ml-auto" />
+    {/* Footer Skeleton */}
+    <div className="flex items-center gap-4 pt-3 border-t border-white/[0.06]">
+      <div className="h-7 w-16 bg-white/[0.05] rounded-full" />
+      <div className="h-7 w-16 bg-white/[0.05] rounded-full" />
+      <div className="h-7 w-16 bg-white/[0.05] rounded-full ml-auto" />
     </div>
   </div>
 );
 
 const safeParsePayload = (res) => {
-  // handle either array response or payload object like before
   if (!res) return { data: [], cursor: 0, hasMore: false };
   if (Array.isArray(res.data)) return { data: res.data, cursor: 0, hasMore: false };
   return {
@@ -50,36 +63,49 @@ const ProjectsPage = () => {
   const [hasMore, setHasMore] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [searchParams, setSearchParams] = useSearchParams();
-  const activeTag = searchParams.get("tag") || null;
+  const activeTag = searchParams.get('tag') || null;
 
-  // intro animation states
+  // Sleek Intro Animation States
   const [isFirstHit, setIsFirstHit] = useState(false);
   const [introFinished, setIntroFinished] = useState(true);
-  const [statusText, setStatusText] = useState("Initializing...");
+  const [statusText, setStatusText] = useState('Initializing runtime...');
+  const [terminalLog, setTerminalLog] = useState([]);
 
-  // debounce / abort control
   const fetchAbortRef = useRef(null);
 
   useEffect(() => {
-    const hasSeenIntro = sessionStorage.getItem("devgram_intro_seen");
+    const hasSeenIntro = sessionStorage.getItem('devgram_intro_seen');
     if (!hasSeenIntro) {
       setIsFirstHit(true);
       setIntroFinished(false);
-      sessionStorage.setItem("devgram_intro_seen", "true");
+      sessionStorage.setItem('devgram_intro_seen', 'true');
 
-      const messages = ["Connecting to Grid...", "Bypassing Firewalls...", "Fetching Nodes...", "Ready."];
-      messages.forEach((msg, i) => {
-        setTimeout(() => setStatusText(msg), i * 600);
+      const logs = [
+        'Booting DevGram microkernel v2.4...',
+        'Connecting to peer mesh network...',
+        'Synchronizing developer feed stream...',
+        'Compiling feed assets...',
+        'System ready.',
+      ];
+
+      logs.forEach((msg, idx) => {
+        setTimeout(() => {
+          setStatusText(msg);
+          setTerminalLog((prev) => [...prev, msg]);
+        }, idx * 450);
       });
 
-      setTimeout(() => setIntroFinished(true), 2800);
+      const timer = setTimeout(() => {
+        setIntroFinished(true);
+      }, 2600);
+
+      return () => clearTimeout(timer);
     }
   }, []);
 
-  // fetch feed (safe, cancelable, supports initial/next)
+  // Fetch Feed with cancelable requests and state safety
   const fetchFeed = useCallback(
     async (isInitial = false) => {
-      // cancel previous
       if (fetchAbortRef.current) {
         fetchAbortRef.current.abort();
       }
@@ -91,14 +117,14 @@ const ProjectsPage = () => {
           setLoading(true);
           setCursor(0);
         } else {
-          if (!hasMore) return;
+          if (!hasMore || loadingMore) return;
           setLoadingMore(true);
         }
 
-        const res = await api.get("/feed", {
+        const res = await api.get('/feed', {
           params: {
             cursor: isInitial ? 0 : cursor,
-            limit: 12,
+            limit: 10,
             tag: activeTag || undefined,
           },
           signal,
@@ -110,10 +136,10 @@ const ProjectsPage = () => {
         setCursor(payload.cursor || 0);
         setHasMore(payload.hasMore ?? false);
       } catch (err) {
-        if (err.name === "CanceledError" || err?.name === "AbortError") {
-          // ignore
+        if (err.name === 'CanceledError' || err?.name === 'AbortError') {
+          // Request was aborted, ignore
         } else {
-          console.error("Fetch failed", err);
+          console.error('Fetch feed failed', err);
           if (isInitial) setFeed([]);
         }
       } finally {
@@ -121,10 +147,10 @@ const ProjectsPage = () => {
         setLoadingMore(false);
       }
     },
-    [cursor, activeTag, hasMore]
+    [cursor, activeTag, hasMore, loadingMore]
   );
 
-  // initial load & reload on tag change
+  // Initial load and reload on tag change
   useEffect(() => {
     setFeed([]);
     setCursor(0);
@@ -133,7 +159,7 @@ const ProjectsPage = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTag]);
 
-  // infinite scroll observer
+  // Infinite scroll IntersectionObserver
   const observer = useRef();
   const lastItemRef = useCallback(
     (node) => {
@@ -146,7 +172,7 @@ const ProjectsPage = () => {
             fetchFeed(false);
           }
         },
-        { rootMargin: "200px" }
+        { rootMargin: '300px' }
       );
 
       if (node) observer.current.observe(node);
@@ -154,102 +180,155 @@ const ProjectsPage = () => {
     [loadingMore, hasMore, fetchFeed, loading]
   );
 
-  // compute top tags (simple frequency count from feed)
-  const topTags = useMemo(() => {
-    const count = {};
-    feed.forEach((it) => {
-      const arr = (it.techStack || []).slice(0, 6);
-      arr.forEach((t) => (count[t] = (count[t] || 0) + 1));
-    });
-    return Object.entries(count)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 10)
-      .map((e) => e[0]);
-  }, [feed]);
-
-  const handleTagClick = (value) => {
-    setSearchParams((prev) => {
-      prev.set("tag", value);
-      return prev;
-    });
-  };
-
   const clearFilter = () => {
     setSearchParams((prev) => {
-      prev.delete("tag");
+      prev.delete('tag');
       return prev;
     });
   };
 
-  // layout: two-column on lg: feed (2/3) + sidebar (1/3)
-  return isFirstHit && !introFinished ? (
-    <div className="fixed inset-0 z-[200] bg-indigo-900/95 flex flex-col items-center justify-center font-mono">
-      <div className="flex flex-col items-center gap-8">
-        <div className="w-24 h-24 bg-indigo-600 rounded-3xl flex items-center justify-center shadow-[0_0_80px_rgba(79,70,229,0.45)] animate-in zoom-in duration-700">
-          <Terminal className="text-white w-12 h-12 stroke-[2.5px]" />
-        </div>
+  const handlePostDeleted = (deletedId) => {
+    setFeed((prev) => prev.filter((item) => item._id !== deletedId));
+  };
 
-        <h1 className="text-6xl md:text-7xl font-black text-white tracking-[0.08em] uppercase italic animate-typing">DevGram</h1>
-
-        <div className="flex flex-col items-center gap-3">
-          <div className="flex items-center gap-3">
-            <Activity className="w-4 h-4 text-indigo-300 animate-pulse" />
-            <span className="text-xs font-black text-indigo-300 uppercase tracking-wider">{statusText}</span>
+  // Modern sleek terminal intro overlay
+  if (isFirstHit && !introFinished) {
+    return (
+      <div className="fixed inset-0 z-50 bg-[#0A0F1E] flex flex-col items-center justify-center p-4 select-none">
+        <div className="w-full max-w-lg bg-black/60 backdrop-blur-2xl border border-white/[0.1] rounded-2xl p-6 shadow-2xl relative overflow-hidden">
+          {/* Mac-style window controls */}
+          <div className="flex items-center gap-2 pb-4 mb-4 border-b border-white/[0.08]">
+            <div className="w-3 h-3 rounded-full bg-red-500/80" />
+            <div className="w-3 h-3 rounded-full bg-amber-500/80" />
+            <div className="w-3 h-3 rounded-full bg-emerald-500/80" />
+            <div className="ml-3 text-xs font-mono text-slate-400 flex items-center gap-2">
+              <Terminal className="w-3.5 h-3.5 text-indigo-400" />
+              devgram@terminal ~
+            </div>
           </div>
 
-          <div className="w-56 h-1 bg-white/10 rounded-full overflow-hidden">
-            <div className="h-full bg-indigo-500 animate-progress" />
+          {/* Terminal log output */}
+          <div className="space-y-2 font-mono text-xs">
+            {terminalLog.map((log, i) => (
+              <div key={i} className="flex items-center gap-2 text-slate-300">
+                <span className="text-indigo-400">➜</span>
+                <span>{log}</span>
+              </div>
+            ))}
+            <div className="flex items-center gap-2 text-indigo-400">
+              <span className="animate-pulse">❯</span>
+              <span className="w-2 h-4 bg-indigo-400 animate-pulse" />
+            </div>
+          </div>
+
+          {/* Progress bar */}
+          <div className="mt-6 pt-4 border-t border-white/[0.06]">
+            <div className="w-full bg-white/[0.08] h-1.5 rounded-full overflow-hidden">
+              <div className="h-full bg-gradient-to-r from-indigo-500 via-violet-500 to-indigo-400 animate-pulse w-full" />
+            </div>
+            <div className="flex justify-between items-center mt-2 text-[11px] font-mono text-slate-400">
+              <span>{statusText}</span>
+              <span className="text-indigo-400 font-semibold">Ready</span>
+            </div>
           </div>
         </div>
       </div>
+    );
+  }
 
-      <style>{`
-        @keyframes typing { from { width: 0 } to { width: 100% } }
-        @keyframes progress { from { width: 0 } to { width: 100% } }
-        .animate-typing { animation: typing 1.6s steps(7,end) forwards; }
-        .animate-progress { animation: progress 2.6s linear forwards; }
-      `}</style>
-    </div>
-  ) : (
-    <div className="max-w-2xl mx-auto">
-      {/* layout grid */}
+  return (
+    <div className="max-w-2xl mx-auto px-4 py-8">
+      {/* Active Filter Header */}
+      {activeTag && (
+        <div className="mb-6 flex items-center justify-between p-3.5 bg-white/[0.03] backdrop-blur-xl border border-white/[0.08] rounded-2xl">
+          <div className="flex items-center gap-2">
+            <Code2 className="w-4 h-4 text-indigo-400" />
+            <span className="text-xs text-slate-400 font-medium">Filtering by tag:</span>
+            <span className="bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 rounded-full px-3 py-0.5 text-xs font-semibold">
+              #{activeTag}
+            </span>
+          </div>
+          <button
+            onClick={clearFilter}
+            className="flex items-center gap-1 text-xs text-slate-400 hover:text-white px-2 py-1 rounded-lg hover:bg-white/[0.05] transition-all"
+          >
+            <X className="w-3.5 h-3.5" />
+            Clear
+          </button>
+        </div>
+      )}
+
+      {/* Main Stream Feed */}
       <main>
         {loading ? (
-          <div className="space-y-8">
-            {[0, 1, 2, 3].map((i) => <SkeletonItem key={i} idx={i} />)}
+          <div className="space-y-6">
+            {[0, 1, 2, 3].map((i) => (
+              <SkeletonFeedItem key={i} idx={i} />
+            ))}
           </div>
         ) : feed.length === 0 ? (
-          <div className="text-center py-24 bg-white rounded-3xl border border-gray-100">
-            <Layers className="mx-auto w-12 h-12 text-slate-400 mb-4" />
-            <h3 className="text-xl font-extrabold text-slate-900 uppercase tracking-tight">No Signal Detected</h3>
-            <p className="text-sm text-slate-500 mt-2">Try clearing filters or create a new post to kickstart the stream.</p>
-            <div className="mt-6">
-              <button onClick={clearFilter} className="px-5 py-2 bg-indigo-600 text-white rounded-xl">Clear Filters</button>
+          <div className="text-center py-20 px-6 bg-white/[0.03] backdrop-blur-xl border border-white/[0.06] rounded-3xl">
+            <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400">
+              <Layers className="w-8 h-8" />
+            </div>
+            <h3 className="text-xl font-bold text-white mb-2">No Posts in Stream</h3>
+            <p className="text-slate-400 text-sm max-w-sm mx-auto mb-6">
+              {activeTag
+                ? `No projects or articles found with tag #${activeTag}.`
+                : 'The feed is waiting for your creativity. Be the first developer to share your build!'}
+            </p>
+            <div className="flex justify-center gap-3">
+              {activeTag && (
+                <button
+                  onClick={clearFilter}
+                  className="bg-white/[0.05] hover:bg-white/[0.1] text-slate-300 border border-white/[0.1] rounded-xl px-4 py-2 text-sm transition-all duration-300"
+                >
+                  Clear Tag Filter
+                </button>
+              )}
+              <Link
+                to="/create"
+                className="bg-gradient-to-r from-indigo-500 to-violet-500 hover:from-indigo-600 hover:to-violet-600 text-white font-medium rounded-xl px-5 py-2 text-sm transition-all duration-300 flex items-center gap-2 shadow-lg shadow-indigo-500/20"
+              >
+                <Plus className="w-4 h-4" />
+                Create Post
+              </Link>
             </div>
           </div>
         ) : (
-          <div className="space-y-8">
+          <div className="space-y-6">
             {feed.map((item, idx) => {
               const isLast = idx === feed.length - 1;
               return (
                 <div
                   key={item._id}
                   ref={isLast ? lastItemRef : null}
-                  className="animate-in fade-in slide-in-from-bottom-6 duration-500 transform hover:scale-[1.01] transition-all"
-                  style={{ animationDelay: `${(idx % 6) * 40}ms` }}
+                  className="transition-all duration-300"
                 >
-                  {item.feedType === "project" ? (
-                    <ProjectCard project={item} showOwnerActions />
+                  {item.feedType === 'project' ? (
+                    <ProjectCard
+                      project={item}
+                      showOwnerActions
+                      onDelete={() => handlePostDeleted(item._id)}
+                    />
                   ) : (
-                    <BlogCard blog={item} showOwnerActions />
+                    <BlogCard
+                      blog={item}
+                      showOwnerActions
+                      onDelete={() => handlePostDeleted(item._id)}
+                    />
                   )}
                 </div>
               );
             })}
 
+            {/* Infinite Scroll Loader */}
             {loadingMore && (
-              <div className="flex justify-center py-6">
-                <Loader2 className="w-6 h-6 text-indigo-500 animate-spin" />
+              <div className="flex justify-center py-8">
+                <div className="flex items-center gap-2.5 px-4 py-2 rounded-full bg-white/[0.04] border border-white/[0.08] text-slate-400 text-xs font-medium">
+                  <Loader2 className="w-4 h-4 text-indigo-400 animate-spin" />
+                  Loading more posts...
+                </div>
               </div>
             )}
           </div>

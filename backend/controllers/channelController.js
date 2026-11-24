@@ -2,35 +2,83 @@ const { getIO } = require("../socket");
 const Channel = require("../models/Channel");
 const Workspace = require("../models/Workspace");
 const ChannelMessage = require("../models/ChannelMessage");
+const multer = require("multer");
+const { CloudinaryStorage } = require("multer-storage-cloudinary");
+const cloudinary = require("../utils/cloudinary");
+
+const checkChannelAdminOrOwner = async (channelId, userId) => {
+  const channel = await Channel.findById(channelId);
+  if (!channel) {
+    return { allowed: false, status: 404, message: "Channel not found", channel: null };
+  }
+
+  const workspace = await Workspace.findById(channel.workspace);
+  if (!workspace) {
+    return { allowed: false, status: 404, message: "Workspace not found", channel };
+  }
+
+  const member = workspace.members.find(
+    (m) => m.user && m.user.toString() === userId
+  );
+
+  if (!member || !["owner", "admin"].includes(member.role)) {
+    return {
+      allowed: false,
+      status: 403,
+      message: "Only workspace admins or owner can manage channels",
+      channel,
+      workspace,
+    };
+  }
+
+  return { allowed: true, channel, workspace };
+};
 
 /* CREATE CHANNEL */
 exports.createChannel = async (req, res) => {
-  const { workspaceId } = req.params;
-  const { name } = req.body;
+  try {
+    const { workspaceId } = req.params;
+    const { name } = req.body;
 
-  const workspace = await Workspace.findById(workspaceId);
-  if (!workspace) return res.status(404).json({ message: "Workspace not found" });
+    const workspace = await Workspace.findById(workspaceId);
+    if (!workspace) return res.status(404).json({ message: "Workspace not found" });
 
-  const channel = await Channel.create({
-    name,
-    workspace: workspaceId,
-    members: workspace.members.map(m => m.user),
-    createdBy: req.userId,
-  });
+    const isMember = workspace.members.some(
+      (m) => m.user && m.user.toString() === req.userId
+    );
+    if (!isMember) {
+      return res.status(403).json({ message: "Not a workspace member" });
+    }
 
-  res.json(channel);
+    const channel = await Channel.create({
+      name,
+      workspace: workspaceId,
+      members: workspace.members.map((m) => m.user),
+      createdBy: req.userId,
+    });
+
+    res.json(channel);
+  } catch (err) {
+    console.error("createChannel error:", err);
+    res.status(500).json({ message: "Server error" });
+  }
 };
 
 /* GET WORKSPACE CHANNELS */
 exports.getChannels = async (req, res) => {
-  const { workspaceId } = req.params;
+  try {
+    const { workspaceId } = req.params;
 
-  const channels = await Channel.find({
-    workspace: workspaceId,
-    members: req.userId,
-  });
+    const channels = await Channel.find({
+      workspace: workspaceId,
+      members: req.userId,
+    });
 
-  res.json(channels);
+    res.json(channels);
+  } catch (err) {
+    console.error("getChannels error:", err);
+    res.status(500).json({ message: "Server error" });
+  }
 };
 
 /* SEND MESSAGE */
@@ -43,11 +91,21 @@ exports.sendMessage = async (req, res) => {
       return res.status(400).json({ message: "Message content required" });
     }
 
+    const channel = await Channel.findById(channelId);
+    if (!channel) {
+      return res.status(404).json({ message: "Channel not found" });
+    }
+
+    const isMember = channel.members.some((m) => m.toString() === req.userId);
+    if (!isMember) {
+      return res.status(403).json({ message: "Not a member of this channel" });
+    }
+
     const msg = await ChannelMessage.create({
       channel: channelId,
       sender: req.userId,
-      type: "text",               // ✅ REQUIRED
-      content: content.trim(),    // ✅ REQUIRED
+      type: "text",
+      content: content.trim(),
     });
 
     const populated = await msg.populate("sender", "name _id");
@@ -63,28 +121,38 @@ exports.sendMessage = async (req, res) => {
 
 /* GET CHANNEL MESSAGES */
 exports.getMessages = async (req, res) => {
-  const { channelId } = req.params;
+  try {
+    const { channelId } = req.params;
 
-  const channel = await Channel.findById(channelId);
-  if (!channel) {
-    return res.status(404).json({ message: "Channel not found" });
+    const channel = await Channel.findById(channelId);
+    if (!channel) {
+      return res.status(404).json({ message: "Channel not found" });
+    }
+
+    if (!channel.members.map(String).includes(req.userId)) {
+      return res.status(403).json({ message: "Access denied" });
+    }
+
+    const messages = await ChannelMessage.find({ channel: channelId })
+      .populate("sender", "name")
+      .sort({ createdAt: 1 });
+
+    res.json(messages);
+  } catch (err) {
+    console.error("getMessages error:", err);
+    res.status(500).json({ message: "Server error" });
   }
-
-  if (!channel.members.map(String).includes(req.userId)) {
-    return res.status(403).json({ message: "Access denied" });
-  }
-
-  const messages = await ChannelMessage.find({ channel: channelId })
-    .populate("sender", "name")
-    .sort({ createdAt: 1 });
-
-  res.json(messages);
 };
 
 exports.updateChannel = async (req, res) => {
   try {
     const { channelId } = req.params;
     const { name, description } = req.body;
+
+    const authCheck = await checkChannelAdminOrOwner(channelId, req.userId);
+    if (!authCheck.allowed) {
+      return res.status(authCheck.status).json({ message: authCheck.message });
+    }
 
     const channel = await Channel.findByIdAndUpdate(
       channelId,
@@ -94,57 +162,100 @@ exports.updateChannel = async (req, res) => {
 
     res.json(channel);
   } catch (err) {
+    console.error("updateChannel error:", err);
     res.status(500).json({ message: "Failed to update channel" });
   }
 };
 
 exports.addMember = async (req, res) => {
-  const { channelId } = req.params;
-  const { userId } = req.body;
+  try {
+    const { channelId } = req.params;
+    const { userId } = req.body;
 
-  await Channel.findByIdAndUpdate(channelId, {
-    $addToSet: { members: userId },
-  });
+    const authCheck = await checkChannelAdminOrOwner(channelId, req.userId);
+    if (!authCheck.allowed) {
+      return res.status(authCheck.status).json({ message: authCheck.message });
+    }
 
-  res.json({ success: true });
+    await Channel.findByIdAndUpdate(channelId, {
+      $addToSet: { members: userId },
+    });
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error("addMember error:", err);
+    res.status(500).json({ message: "Server error" });
+  }
 };
 
 exports.removeMember = async (req, res) => {
-  const { channelId, userId } = req.params;
+  try {
+    const { channelId, userId } = req.params;
 
-  await Channel.findByIdAndUpdate(channelId, {
-    $pull: { members: userId },
-  });
+    const authCheck = await checkChannelAdminOrOwner(channelId, req.userId);
+    if (!authCheck.allowed) {
+      return res.status(authCheck.status).json({ message: authCheck.message });
+    }
 
-  res.json({ success: true });
+    await Channel.findByIdAndUpdate(channelId, {
+      $pull: { members: userId },
+    });
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error("removeMember error:", err);
+    res.status(500).json({ message: "Server error" });
+  }
 };
 
 exports.deleteChannel = async (req, res) => {
-  const channel = await Channel.findById(req.params.channelId);
+  try {
+    const { channelId } = req.params;
 
-  if (channel.name === "general") {
-    return res.status(400).json({ message: "Cannot delete general channel" });
+    const authCheck = await checkChannelAdminOrOwner(channelId, req.userId);
+    if (!authCheck.allowed) {
+      return res.status(authCheck.status).json({ message: authCheck.message });
+    }
+
+    const channel = authCheck.channel;
+
+    if (channel.name === "general") {
+      return res.status(400).json({ message: "Cannot delete general channel" });
+    }
+
+    await ChannelMessage.deleteMany({ channel: channel._id });
+    await channel.deleteOne();
+    res.json({ success: true });
+  } catch (err) {
+    console.error("deleteChannel error:", err);
+    res.status(500).json({ message: "Server error" });
   }
-
-  await channel.deleteOne();
-  res.json({ success: true });
 };
-
-const multer = require("multer");
-const { CloudinaryStorage } = require("multer-storage-cloudinary");
-const cloudinary = require("../utils/cloudinary");
 
 const storage = new CloudinaryStorage({
   cloudinary,
   params: {
     folder: "devgram/channels",
-    resource_type: "auto", // 🔥 allows image + pdf + zip + everything
+    resource_type: "auto",
     allowed_formats: [
-      "jpg", "jpeg", "png", "webp", "gif",
-      "pdf", "zip", "txt", "json",
-      "js", "ts", "py",
-      "doc", "docx", "ppt", "pptx",
-      "xls", "xlsx",
+      "jpg",
+      "jpeg",
+      "png",
+      "webp",
+      "gif",
+      "pdf",
+      "zip",
+      "txt",
+      "json",
+      "js",
+      "ts",
+      "py",
+      "doc",
+      "docx",
+      "ppt",
+      "pptx",
+      "xls",
+      "xlsx",
     ],
   },
 });
@@ -166,9 +277,17 @@ exports.sendChannelFile = async (req, res) => {
       return res.status(400).json({ message: "No file uploaded" });
     }
 
-    // 🔥 CRITICAL FIX
-    const fileUrl =
-      req.file.secure_url || req.file.path || req.file.url;
+    const channel = await Channel.findById(channelId);
+    if (!channel) {
+      return res.status(404).json({ message: "Channel not found" });
+    }
+
+    const isMember = channel.members.some((m) => m.toString() === req.userId);
+    if (!isMember) {
+      return res.status(403).json({ message: "Not a member of this channel" });
+    }
+
+    const fileUrl = req.file.secure_url || req.file.path || req.file.url;
 
     if (!fileUrl) {
       console.error("Cloudinary file object:", req.file);
@@ -178,12 +297,13 @@ exports.sendChannelFile = async (req, res) => {
     const message = await ChannelMessage.create({
       channel: channelId,
       sender: req.userId,
-      type: req.file.mimetype.startsWith("image")
-        ? "image"
-        : "file",
-      content: fileUrl,                 // ✅ NOW NEVER UNDEFINED
-      fileName: req.file.originalname,
-      fileSize: req.file.size,
+      type: req.file.mimetype.startsWith("image") ? "image" : "file",
+      content: fileUrl,
+      fileMeta: {
+        name: req.file.originalname,
+        size: req.file.size,
+        mime: req.file.mimetype,
+      },
     });
 
     const populated = await message.populate("sender", "name _id");
@@ -202,12 +322,27 @@ exports.deleteChannelMessage = async (req, res) => {
     const msg = await ChannelMessage.findById(req.params.id);
     if (!msg) return res.status(404).json({ message: "Message not found" });
 
-    // 🔥 try cloudinary delete, but NEVER block realtime
+    const channel = await Channel.findById(msg.channel);
+    if (!channel) return res.status(404).json({ message: "Channel not found" });
+
+    const workspace = await Workspace.findById(channel.workspace);
+    const memberRecord = workspace?.members.find(
+      (m) => m.user && m.user.toString() === req.userId
+    );
+    const isAdminOrOwner =
+      memberRecord && ["owner", "admin"].includes(memberRecord.role);
+    const isSender = msg.sender.toString() === req.userId;
+
+    if (!isSender && !isAdminOrOwner) {
+      return res.status(403).json({ message: "Not allowed to delete this message" });
+    }
+
+    // try cloudinary delete, but NEVER block realtime
     if (msg.type !== "text" && msg.content) {
       try {
         const publicId = msg.content
           .split("/")
-          .slice(-2)
+          .slice(-3)
           .join("/")
           .split(".")[0];
 
@@ -215,13 +350,12 @@ exports.deleteChannelMessage = async (req, res) => {
           resource_type: msg.type === "image" ? "image" : "raw",
         });
       } catch (err) {
-        console.warn("Cloudinary delete failed (ignored)");
+        console.warn("Cloudinary delete failed (ignored):", err.message);
       }
     }
 
     await msg.deleteOne();
 
-    
     getIO()
       .to(msg.channel.toString())
       .emit("deleteChannelMessage", msg._id);

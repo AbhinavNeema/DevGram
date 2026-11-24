@@ -2,6 +2,7 @@ const User = require("../models/User");
 const Project = require("../models/Project");
 const mongoose = require("mongoose");
 const Blog = require("../models/Blog");
+
 exports.toggleFollow = async (req, res) => {
   try {
     const targetUserId = req.params.id;
@@ -16,24 +17,42 @@ exports.toggleFollow = async (req, res) => {
       return res.status(404).json({ message: "User not found" });
     }
 
-    const isFollowing = targetUser.followers.includes(currentUserId);
+    const isFollowing = targetUser.followers.some(
+      (id) => id.toString() === currentUserId
+    );
 
     if (isFollowing) {
       await User.findByIdAndUpdate(targetUserId, {
         $pull: { followers: currentUserId },
       });
 
-      await User.findByIdAndUpdate(currentUserId, {
-        $pull: { following: targetUserId },
-      });
+      try {
+        await User.findByIdAndUpdate(currentUserId, {
+          $pull: { following: targetUserId },
+        });
+      } catch (err) {
+        // Revert first update if second fails
+        await User.findByIdAndUpdate(targetUserId, {
+          $addToSet: { followers: currentUserId },
+        });
+        throw err;
+      }
     } else {
       await User.findByIdAndUpdate(targetUserId, {
         $addToSet: { followers: currentUserId },
       });
 
-      await User.findByIdAndUpdate(currentUserId, {
-        $addToSet: { following: targetUserId },
-      });
+      try {
+        await User.findByIdAndUpdate(currentUserId, {
+          $addToSet: { following: targetUserId },
+        });
+      } catch (err) {
+        // Revert first update if second fails
+        await User.findByIdAndUpdate(targetUserId, {
+          $pull: { followers: currentUserId },
+        });
+        throw err;
+      }
     }
 
     const updatedUser = await User.findById(targetUserId).select("followers");
@@ -44,6 +63,7 @@ exports.toggleFollow = async (req, res) => {
       followersCount: updatedUser.followers.length,
     });
   } catch (err) {
+    console.error("toggleFollow error:", err);
     res.status(500).json({ message: "Server error" });
   }
 };
@@ -57,7 +77,7 @@ exports.getUserProfile = async (req, res) => {
     }
 
     const user = await User.findById(userId)
-      .select("-password")
+      .select("-password -embedding")
       .populate("followers", "name")
       .populate("following", "name");
 
@@ -66,14 +86,15 @@ exports.getUserProfile = async (req, res) => {
     }
 
     const projects = await Project.find({ owner: userId })
+      .select("-embedding")
       .populate("owner", "name username")
       .populate("comments.author", "name username")
       .populate("comments.mentions", "username")
       .populate("mentions", "username")
       .sort({ createdAt: -1 });
-      
 
     const blogs = await Blog.find({ author: userId })
+      .select("-embedding")
       .populate("author", "name username")
       .populate("mentions", "username")
       .sort({ createdAt: -1 });
@@ -83,7 +104,7 @@ exports.getUserProfile = async (req, res) => {
       projects,
       blogs,
       followersCount: user.followers.length,
-      followingCount: user.following.length
+      followingCount: user.following.length,
     });
   } catch (err) {
     console.error("Get profile error:", err);
@@ -99,23 +120,31 @@ exports.updateUserProfile = async (req, res) => {
       return res.status(403).json({ message: "Not allowed" });
     }
 
-    const { bio, about } = req.body;
-
-    let techStack = [];
-
-    if (req.body.techStack) {
-      techStack = JSON.parse(req.body.techStack);
-    }
-
     const user = await User.findById(userId);
 
     if (!user) {
       return res.status(404).json({ message: "User not found" });
     }
 
-    user.bio = bio;
-    user.about = about;
-    user.techStack = techStack;
+    const { name, bio, about } = req.body;
+
+    if (name !== undefined) user.name = name;
+    if (bio !== undefined) user.bio = bio;
+    if (about !== undefined) user.about = about;
+
+    if (req.body.techStack !== undefined) {
+      let techStack = req.body.techStack;
+      if (typeof techStack === "string") {
+        try {
+          techStack = JSON.parse(techStack);
+        } catch {
+          techStack = techStack.split(",").map((t) => t.trim());
+        }
+      }
+      if (Array.isArray(techStack)) {
+        user.techStack = techStack;
+      }
+    }
 
     // ✅ PROFILE PHOTO
     if (req.file) {
@@ -125,7 +154,6 @@ exports.updateUserProfile = async (req, res) => {
     await user.save();
 
     res.json(user);
-
   } catch (err) {
     console.error("Update profile error:", err);
     res.status(500).json({ message: "Server error" });
@@ -135,11 +163,12 @@ exports.updateUserProfile = async (req, res) => {
 exports.getAllUsers = async (req, res) => {
   try {
     const users = await User.find({ _id: { $ne: req.userId } })
-      .select("-password")
+      .select("-password -embedding")
       .sort({ createdAt: -1 });
 
     res.json(users);
   } catch (err) {
+    console.error("getAllUsers error:", err);
     res.status(500).json({ message: "Server error" });
   }
 };
@@ -147,20 +176,20 @@ exports.getAllUsers = async (req, res) => {
 exports.getUserByUsername = async (req, res) => {
   try {
     const user = await User.findOne({ username: req.params.username }).select(
-      "-password"
+      "-password -embedding"
     );
 
     if (!user) {
       return res.status(404).json({ message: "User not found" });
     }
 
-    const projects = await Project.find({ owner: user._id }).populate(
-      "owner",
-      "name username"
-    );
+    const projects = await Project.find({ owner: user._id })
+      .select("-embedding")
+      .populate("owner", "name username");
 
     res.json({ user, projects });
   } catch (err) {
+    console.error("getUserByUsername error:", err);
     res.status(500).json({ message: "Server error" });
   }
 };
@@ -183,12 +212,9 @@ exports.searchUsers = async (req, res) => {
 
     const prefixMatches = await User.find({
       _id: { $ne: currentUserId },
-      $or: [
-        { username: prefixRegex },
-        { name: prefixRegex }
-      ]
+      $or: [{ username: prefixRegex }, { name: prefixRegex }],
     })
-      .select("name username bio")
+      .select("name username bio profilePhoto")
       .limit(6)
       .lean();
 
@@ -197,12 +223,9 @@ exports.searchUsers = async (req, res) => {
 
     const partialMatches = await User.find({
       _id: { $ne: currentUserId },
-      $or: [
-        { username: partialRegex },
-        { name: partialRegex }
-      ]
+      $or: [{ username: partialRegex }, { name: partialRegex }],
     })
-      .select("name username bio")
+      .select("name username bio profilePhoto")
       .limit(10)
       .lean();
 
@@ -210,12 +233,11 @@ exports.searchUsers = async (req, res) => {
     const combined = [
       ...prefixMatches,
       ...partialMatches.filter(
-        p => !prefixMatches.find(x => x._id.toString() === p._id.toString())
-      )
+        (p) => !prefixMatches.find((x) => x._id.toString() === p._id.toString())
+      ),
     ];
 
     res.json(combined.slice(0, 10));
-
   } catch (err) {
     console.error("User Search Error:", err);
     res.status(500).json({ message: "Server error" });

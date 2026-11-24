@@ -1,113 +1,168 @@
-import { useEffect, useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
-import api from "../api/axios";
-import ProjectCard from "../components/ProjectCard";
-import BlogCard from "../components/BlogCard";
+import { useEffect, useState } from 'react';
+import { useParams, useNavigate, Link } from 'react-router-dom';
+import api from '../api/axios';
+import { useAuth } from '../context/AuthContext';
+import ProjectCard from '../components/ProjectCard';
+import BlogCard from '../components/BlogCard';
+import toast from 'react-hot-toast';
 import {
   Share2,
   MessageSquare,
-  Settings,
   Edit3,
-  X,
   Cpu,
   Terminal,
-  Rocket
-} from "lucide-react";
+  Rocket,
+  UserX,
+  Loader2,
+  Check,
+  BookOpen,
+  Calendar,
+} from 'lucide-react';
 
 const UserProfile = () => {
   const { id, username } = useParams();
   const navigate = useNavigate();
+  const { user: currentUser } = useAuth();
+  const currentUserId = currentUser?.id || null;
 
   const [data, setData] = useState(null);
   const [blogs, setBlogs] = useState([]);
-  const [activeTab, setActiveTab] = useState("projects");
+  const [activeTab, setActiveTab] = useState('projects'); // 'projects' | 'blogs'
   const [isFollowing, setIsFollowing] = useState(false);
-  const [toast, setToast] = useState("");
-
-  const token = localStorage.getItem("token");
-
-  let currentUserId = null;
-  try {
-    if (token) {
-      const payload = JSON.parse(atob(token.split(".")[1]));
-      currentUserId = payload?.id || payload?._id || payload?.sub || null;
-    }
-  } catch {}
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [followingLoading, setFollowingLoading] = useState(false);
 
   useEffect(() => {
     const fetchProfile = async () => {
-      const url = username ? `/users/username/${username}` : `/users/${id}`;
-      const res = await api.get(url);
+      try {
+        setLoading(true);
+        setError(false);
+        const url = username
+          ? `/users/username/${encodeURIComponent(username)}`
+          : `/users/${id}`;
+        const res = await api.get(url);
+        setData(res.data);
 
-      setData(res.data);
-
-      if (currentUserId) {
-        setIsFollowing(
-          res.data.user.followers.some(
-            f => String(f._id) === String(currentUserId)
-          )
-        );
+        if (currentUserId && res.data?.user?.followers) {
+          setIsFollowing(
+            res.data.user.followers.some(
+              (f) => String(f._id || f) === String(currentUserId)
+            )
+          );
+        }
+      } catch (err) {
+        console.error('Profile fetch failed', err);
+        setError(true);
+      } finally {
+        setLoading(false);
       }
     };
 
-    fetchProfile();
-  }, [id, username]);
+    if (id || username) {
+      fetchProfile();
+    }
+  }, [id, username, currentUserId]);
 
   useEffect(() => {
-    if (activeTab !== "blogs" || !data?.user?._id) return;
+    if (activeTab !== 'blogs' || !data?.user?._id) return;
 
-    api.get(`/blogs/user/${data.user._id}`).then(res => {
-      setBlogs(res.data);
-    });
+    api
+      .get(`/blogs/user/${data.user._id}`)
+      .then((res) => {
+        setBlogs(Array.isArray(res.data) ? res.data : []);
+      })
+      .catch((err) => {
+        console.error('Fetch user blogs failed', err);
+      });
   }, [activeTab, data]);
 
   const toggleFollow = async () => {
-    const res = await api.put(`/users/${data.user._id}/follow`);
-
-    setIsFollowing(res.data.following);
-
-    setData(prev => ({
-      ...prev,
-      user: {
-        ...prev.user,
-        followers: res.data.followers
-      }
-    }));
+    if (!data?.user?._id || followingLoading) return;
+    setFollowingLoading(true);
+    try {
+      const res = await api.put(`/users/${data.user._id}/follow`);
+      setIsFollowing(res.data.following);
+      setData((prev) => ({
+        ...prev,
+        user: {
+          ...prev.user,
+          followers: res.data.followers,
+        },
+      }));
+      toast.success(res.data.following ? 'Followed user' : 'Unfollowed user');
+    } catch (err) {
+      console.error('Follow toggle failed', err);
+      toast.error('Failed to update follow status');
+    } finally {
+      setFollowingLoading(false);
+    }
   };
 
   const startDM = async () => {
-    const res = await api.get(`/messages/start/${data.user._id}`);
-    navigate(`/dm/${res.data._id}`);
+    if (!data?.user?._id) return;
+    try {
+      const res = await api.get(`/messages/start/${data.user._id}`);
+      navigate(`/dm/${res.data._id}`);
+    } catch (err) {
+      console.error('Start DM failed', err);
+      toast.error('Could not open direct message');
+    }
   };
 
-  if (!data) {
+  const handleShare = () => {
+    navigator.clipboard.writeText(window.location.href);
+    setCopied(true);
+    toast.success('Profile link copied to clipboard!');
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  if (loading) {
     return (
-      <div className="flex justify-center py-40">
-        <div className="w-12 h-12 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"/>
+      <div className="max-w-6xl mx-auto px-4 py-32 flex flex-col items-center justify-center">
+        <Loader2 className="w-10 h-10 animate-spin text-indigo-400 mb-3" />
+        <span className="text-slate-400 text-sm font-medium">Loading developer profile...</span>
       </div>
     );
   }
 
-  const { user, projects } = data;
-  const isOwner =
-    currentUserId && String(currentUserId) === String(user._id);
+  if (error || !data?.user) {
+    return (
+      <div className="max-w-md mx-auto px-4 py-28 text-center">
+        <div className="bg-white/[0.03] backdrop-blur-xl border border-white/[0.06] rounded-3xl p-8 shadow-xl">
+          <div className="w-16 h-16 rounded-2xl bg-white/[0.05] border border-white/[0.1] flex items-center justify-center text-slate-400 mx-auto mb-4">
+            <UserX className="w-8 h-8" />
+          </div>
+          <h2 className="text-xl font-bold text-white mb-2">Developer Not Found</h2>
+          <p className="text-sm text-slate-400 mb-6">
+            The profile you are looking for does not exist or may have been removed.
+          </p>
+          <button
+            onClick={() => navigate('/')}
+            className="inline-flex items-center gap-2 bg-gradient-to-r from-indigo-500 to-violet-500 hover:from-indigo-600 hover:to-violet-600 text-white font-medium rounded-xl px-5 py-2.5 text-sm transition-all shadow-lg shadow-indigo-500/20"
+          >
+            Explore Feed
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  const { user, projects = [] } = data;
+  const isOwner = currentUserId && String(currentUserId) === String(user._id);
 
   return (
-    <div className="max-w-6xl mx-auto px-4 pb-24 pt-10 bg-gray-50 min-h-screen">
-
+    <div className="max-w-6xl mx-auto px-4 pb-20 pt-6">
       {/* ================= HERO HEADER ================= */}
+      <div className="relative mb-8">
+        {/* Glow backdrop */}
+        <div className="absolute -top-16 left-1/2 -translate-x-1/2 w-[600px] h-[350px] bg-indigo-600/10 blur-[130px] pointer-events-none" />
 
-      <div className="relative mb-12">
-
-        <div className="absolute -top-20 left-1/2 -translate-x-1/2 w-[700px] h-[400px] bg-indigo-600/10 blur-[120px] pointer-events-none" />
-
-        <div className="relative bg-white border border-gray-200 rounded-[40px] p-10 shadow-xl">
-
-          <div className="flex flex-col md:flex-row items-center md:items-start gap-8">
-
+        <div className="relative bg-white/[0.03] backdrop-blur-xl border border-white/[0.06] rounded-3xl p-6 sm:p-10 shadow-2xl">
+          <div className="flex flex-col md:flex-row items-center md:items-start gap-6 sm:gap-8">
             {/* Avatar */}
-
-            <div className="w-28 h-28 rounded-3xl overflow-hidden border border-gray-200 shadow-lg bg-gray-100 flex items-center justify-center">
+            <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-3xl overflow-hidden border-2 border-white/10 shadow-2xl bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center shrink-0">
               {user.profilePhoto ? (
                 <img
                   src={user.profilePhoto}
@@ -115,243 +170,225 @@ const UserProfile = () => {
                   className="w-full h-full object-cover"
                 />
               ) : (
-                <div className="w-full h-full bg-gradient-to-tr from-indigo-500 to-purple-600 flex items-center justify-center text-4xl font-black text-white">
-                  {user.name?.[0]}
-                </div>
+                <span className="text-3xl sm:text-4xl font-extrabold text-white">
+                  {user.name?.[0]?.toUpperCase() || user.username?.[0]?.toUpperCase() || 'U'}
+                </span>
               )}
             </div>
 
-            {/* Identity */}
-
+            {/* Identity & Bio */}
             <div className="flex-1 text-center md:text-left">
-
-              <div className="flex flex-col md:flex-row md:items-center gap-3">
-
-                <h1 className="text-3xl font-black text-gray-900 tracking-tight">
+              <div className="flex flex-col md:flex-row md:items-center gap-2.5">
+                <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
                   {user.name}
                 </h1>
-
-                <span className="text-xs font-black uppercase tracking-widest text-indigo-400 bg-indigo-500/10 px-3 py-1 rounded-full border border-indigo-500/20">
+                <span className="bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 rounded-full px-3 py-1 text-xs font-semibold self-center md:self-auto">
                   @{user.username}
                 </span>
-
               </div>
 
-              <p className="text-gray-600 mt-3 max-w-xl text-sm">
-                {user.bio || "Developer building things on DevGram."}
+              <p className="text-slate-300 mt-2.5 max-w-2xl text-sm leading-relaxed">
+                {user.bio || 'Building software and exploring architectures on DevGram.'}
               </p>
 
               {/* Stats */}
-
-              <div className="flex justify-center md:justify-start gap-10 mt-6">
-
+              <div className="flex justify-center md:justify-start gap-8 mt-5">
                 <div className="text-center md:text-left">
-                  <p className="text-gray-900 text-xl font-black">{projects.length}</p>
-                  <p className="text-[10px] uppercase tracking-widest text-gray-500">Projects</p>
+                  <p className="text-white text-lg font-bold">{projects.length}</p>
+                  <p className="text-[10px] uppercase tracking-wider text-slate-400 font-medium">
+                    Projects
+                  </p>
                 </div>
 
                 <div className="text-center md:text-left">
-                  <p className="text-gray-900 text-xl font-black">{user.followers.length}</p>
-                  <p className="text-[10px] uppercase tracking-widest text-gray-500">Followers</p>
+                  <p className="text-white text-lg font-bold">
+                    {user.followers?.length || 0}
+                  </p>
+                  <p className="text-[10px] uppercase tracking-wider text-slate-400 font-medium">
+                    Followers
+                  </p>
                 </div>
 
                 <div className="text-center md:text-left">
-                  <p className="text-gray-900 text-xl font-black">{user.following.length}</p>
-                  <p className="text-[10px] uppercase tracking-widest text-gray-500">Following</p>
+                  <p className="text-white text-lg font-bold">
+                    {user.following?.length || 0}
+                  </p>
+                  <p className="text-[10px] uppercase tracking-wider text-slate-400 font-medium">
+                    Following
+                  </p>
                 </div>
-
               </div>
-
             </div>
 
             {/* Actions */}
-
-            <div className="flex gap-3">
-
+            <div className="flex items-center gap-2.5 shrink-0 self-center md:self-start">
               <button
-                onClick={() => {
-                  navigator.clipboard.writeText(window.location.href);
-                  setToast("Profile link copied");
-                  setTimeout(() => setToast(""), 2000);
-                }}
-                className="p-3 rounded-xl bg-gray-100 hover:bg-gray-200 border border-gray-200 transition"
+                onClick={handleShare}
+                aria-label="Share profile"
+                className="p-3 rounded-xl bg-white/[0.05] hover:bg-white/[0.1] text-slate-300 border border-white/[0.1] transition-all hover:scale-105"
               >
-                <Share2 size={18}/>
+                {copied ? (
+                  <Check className="w-4 h-4 text-emerald-400" />
+                ) : (
+                  <Share2 className="w-4 h-4" />
+                )}
               </button>
 
               {!isOwner && (
                 <>
                   <button
                     onClick={toggleFollow}
-                    className={`px-6 py-3 rounded-xl font-black text-xs uppercase tracking-widest transition ${
+                    disabled={followingLoading}
+                    className={`px-5 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all shadow-md ${
                       isFollowing
-                        ? "bg-white/5 border border-white/10 text-slate-300"
-                        : "bg-indigo-600 text-white hover:bg-indigo-500"
+                        ? 'bg-white/[0.05] hover:bg-white/[0.1] text-slate-300 border border-white/[0.1]'
+                        : 'bg-gradient-to-r from-indigo-500 to-violet-500 hover:from-indigo-600 hover:to-violet-600 text-white shadow-indigo-500/25'
                     }`}
                   >
-                    {isFollowing ? "Following" : "Follow"}
+                    {isFollowing ? 'Following' : 'Follow'}
                   </button>
 
                   <button
                     onClick={startDM}
-                    className="p-3 rounded-xl bg-white/5 hover:bg-indigo-600 border border-white/10 transition"
+                    aria-label="Direct message"
+                    className="p-3 rounded-xl bg-white/[0.05] hover:bg-white/[0.1] text-slate-300 border border-white/[0.1] hover:text-white transition-all hover:scale-105"
                   >
-                    <MessageSquare size={18}/>
+                    <MessageSquare className="w-4 h-4" />
                   </button>
                 </>
               )}
 
               {isOwner && (
-                <>
-                  <button
-                    onClick={() => navigate(`/edit-profile/${user._id}`)}
-                    className="flex items-center gap-2 px-5 py-3 rounded-xl bg-indigo-600 text-white hover:bg-indigo-500 font-black text-xs uppercase tracking-widest shadow-sm"
-                  >
-                    <Edit3 size={16} />
-                    Edit Profile
-                  </button>
-
-                  
-                    
-                </>
+                <button
+                  onClick={() => navigate(`/edit-profile/${user._id}`)}
+                  className="flex items-center gap-2 bg-gradient-to-r from-indigo-500 to-violet-500 hover:from-indigo-600 hover:to-violet-600 text-white text-xs font-bold uppercase tracking-wider rounded-xl px-5 py-2.5 transition-all shadow-lg shadow-indigo-500/20 hover:scale-105"
+                >
+                  <Edit3 className="w-3.5 h-3.5" />
+                  Edit Profile
+                </button>
               )}
-
             </div>
-
           </div>
-
         </div>
       </div>
 
-
       {/* ================= MAIN GRID ================= */}
-
-      <div className="grid lg:grid-cols-[320px_1fr] gap-10">
-
+      <div className="grid lg:grid-cols-[300px_1fr] gap-8">
         {/* SIDEBAR */}
-
-        <div className="space-y-8">
-
+        <div className="space-y-6">
           {/* About */}
-
-          <div className="bg-white border border-gray-200 rounded-3xl p-6 shadow-sm">
-
-            <div className="flex items-center gap-2 mb-4 text-indigo-400">
-              <Terminal size={16}/>
-              <span className="text-[10px] font-black uppercase tracking-widest">
-                About
+          <div className="bg-white/[0.03] backdrop-blur-xl border border-white/[0.06] rounded-2xl p-5 shadow-lg">
+            <div className="flex items-center gap-2 mb-3 text-indigo-400">
+              <Terminal className="w-4 h-4" />
+              <span className="text-[11px] font-bold uppercase tracking-wider">
+                About Developer
               </span>
             </div>
-
-            <p className="text-gray-600 text-sm leading-relaxed">
-              {user.about || "No description available."}
+            <p className="text-slate-300 text-sm leading-relaxed">
+              {user.about || 'No detailed background provided yet.'}
             </p>
-
           </div>
 
-          {/* Tech stack */}
-
-          <div className="bg-white border border-gray-200 rounded-3xl p-6 shadow-sm">
-
-            <div className="flex items-center gap-2 mb-4 text-indigo-400">
-              <Cpu size={16}/>
-              <span className="text-[10px] font-black uppercase tracking-widest">
-                Tech Stack
+          {/* Tech Stack */}
+          <div className="bg-white/[0.03] backdrop-blur-xl border border-white/[0.06] rounded-2xl p-5 shadow-lg">
+            <div className="flex items-center gap-2 mb-3 text-indigo-400">
+              <Cpu className="w-4 h-4" />
+              <span className="text-[11px] font-bold uppercase tracking-wider">
+                Tech Stack & Tools
               </span>
             </div>
 
             <div className="flex flex-wrap gap-2">
-
               {user.techStack?.length ? (
-                user.techStack.map(skill => (
+                user.techStack.map((skill) => (
                   <span
                     key={skill}
-                    className="px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest bg-indigo-600/10 text-indigo-400 border border-indigo-500/20"
+                    className="bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 rounded-full px-3 py-1 text-xs font-semibold"
                   >
                     {skill}
                   </span>
                 ))
               ) : (
-                <span className="text-gray-500 text-sm">
+                <span className="text-slate-500 text-xs">
                   No technologies listed
                 </span>
               )}
-
             </div>
-
           </div>
-
         </div>
 
-
-        {/* FEED */}
-
+        {/* FEED / CONTENT TABS */}
         <div>
+          {/* Tabs bar */}
+          <div className="flex gap-6 border-b border-white/[0.06] mb-6">
+            <button
+              onClick={() => setActiveTab('projects')}
+              className={`pb-3 text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-2 ${
+                activeTab === 'projects'
+                  ? 'text-indigo-400 border-b-2 border-indigo-500'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <Rocket className="w-3.5 h-3.5" />
+              Projects ({projects.length})
+            </button>
 
-          {/* Tabs */}
-
-          <div className="flex gap-8 border-b border-gray-200 mb-8">
-
-            {["projects", "blogs"].map(tab => (
-              <button
-                key={tab}
-                onClick={() => setActiveTab(tab)}
-                className={`pb-3 text-xs font-black uppercase tracking-widest transition ${
-                  activeTab === tab
-                    ? "text-indigo-400 border-b-2 border-indigo-500"
-                    : "text-slate-500 hover:text-white"
-                }`}
-              >
-                {tab}
-              </button>
-            ))}
-
+            <button
+              onClick={() => setActiveTab('blogs')}
+              className={`pb-3 text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-2 ${
+                activeTab === 'blogs'
+                  ? 'text-indigo-400 border-b-2 border-indigo-500'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <BookOpen className="w-3.5 h-3.5" />
+              Articles
+            </button>
           </div>
 
-
-          {/* Feed Content */}
-
-          <div className="space-y-8">
-
-            {activeTab === "projects" ? (
+          {/* Content Lists */}
+          <div className="space-y-6">
+            {activeTab === 'projects' ? (
               projects.length === 0 ? (
-                <div className="text-center py-20 bg-white border border-gray-200 rounded-3xl">
-                  <Rocket className="mx-auto mb-4 opacity-40"/>
-                  <p className="text-gray-500 text-sm">No projects published</p>
+                <div className="text-center py-16 px-6 bg-white/[0.03] backdrop-blur-xl border border-white/[0.06] rounded-2xl">
+                  <Rocket className="w-10 h-10 text-slate-500 mx-auto mb-3" />
+                  <p className="text-sm text-slate-400">No projects published yet</p>
                 </div>
               ) : (
-                projects.map(p => (
-                  <ProjectCard key={p._id} project={p} showOwnerActions />
+                projects.map((p) => (
+                  <ProjectCard
+                    key={p._id}
+                    project={p}
+                    showOwnerActions={isOwner}
+                    onDelete={() => {
+                      setData((prev) => ({
+                        ...prev,
+                        projects: prev.projects.filter((item) => item._id !== p._id),
+                      }));
+                    }}
+                  />
                 ))
               )
+            ) : blogs.length === 0 ? (
+              <div className="text-center py-16 px-6 bg-white/[0.03] backdrop-blur-xl border border-white/[0.06] rounded-2xl">
+                <BookOpen className="w-10 h-10 text-slate-500 mx-auto mb-3" />
+                <p className="text-sm text-slate-400">No articles published yet</p>
+              </div>
             ) : (
-              blogs.length === 0 ? (
-                <div className="text-center py-20 bg-white border border-gray-200 rounded-3xl">
-                  <Terminal className="mx-auto mb-4 opacity-40"/>
-                  <p className="text-gray-500 text-sm">No blogs published</p>
-                </div>
-              ) : (
-                blogs.map(b => (
-                  <BlogCard key={b._id} blog={b} showOwnerActions />
-                ))
-              )
+              blogs.map((b) => (
+                <BlogCard
+                  key={b._id}
+                  blog={b}
+                  showOwnerActions={isOwner}
+                  onDelete={() => {
+                    setBlogs((prev) => prev.filter((item) => item._id !== b._id));
+                  }}
+                />
+              ))
             )}
-
           </div>
-
         </div>
-
       </div>
-
-
-      {/* Toast */}
-
-      {toast && (
-        <div className="fixed bottom-10 left-1/2 -translate-x-1/2 px-6 py-3 bg-white border border-gray-200 rounded-full text-sm text-gray-800 shadow-lg">
-          {toast}
-        </div>
-      )}
-
     </div>
   );
 };

@@ -10,16 +10,29 @@ exports.register = async (req, res) => {
       return res.status(400).json({ message: "All fields required" });
     }
 
-    if (!/^[a-z0-9_.]+$/.test(username)) {
-      return res.status(400).json({ message: "Invalid username format" });
+    const normalizedEmail = email.toLowerCase().trim();
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(normalizedEmail)) {
+      return res.status(400).json({ message: "Invalid email format" });
     }
 
-    const usernameExists = await User.findOne({ username });
+    if (password.length < 8) {
+      return res.status(400).json({ message: "Password must be at least 8 characters long" });
+    }
+
+    const normalizedUsername = username.toLowerCase().trim();
+    if (normalizedUsername.length < 3 || !/^[a-z0-9_.]+$/.test(normalizedUsername)) {
+      return res.status(400).json({
+        message: "Username must be at least 3 characters and contain only letters, numbers, underscores, and dots",
+      });
+    }
+
+    const usernameExists = await User.findOne({ username: normalizedUsername });
     if (usernameExists) {
       return res.status(409).json({ message: "Username already taken" });
     }
 
-    const emailExists = await User.findOne({ email });
+    const emailExists = await User.findOne({ email: normalizedEmail });
     if (emailExists) {
       return res.status(409).json({ message: "Email already registered" });
     }
@@ -27,20 +40,20 @@ exports.register = async (req, res) => {
     const hashedPassword = await bcrypt.hash(password, 10);
 
     const user = await User.create({
-      name,
-      email,
-      username,
-      password: hashedPassword
+      name: name.trim(),
+      email: normalizedEmail,
+      username: normalizedUsername,
+      password: hashedPassword,
     });
 
-    // 🔐 NEW JWT FORMAT
+    // 🔐 JWT FORMAT
     const token = jwt.sign(
       {
         iss: "devgram",
         sub: user._id.toString(),
         email: user.email,
         username: user.username,
-        name: user.name
+        name: user.name,
       },
       process.env.JWT_SECRET,
       { expiresIn: "7d" }
@@ -52,14 +65,14 @@ exports.register = async (req, res) => {
         id: user._id,
         name: user.name,
         username: user.username,
-        email: user.email
-      }
+        email: user.email,
+      },
     });
   } catch (err) {
     if (err.code === 11000) {
       return res.status(409).json({ message: "Username or email already exists" });
     }
-
+    console.error("Register error:", err);
     res.status(500).json({ message: "Server error" });
   }
 };
@@ -67,25 +80,29 @@ exports.register = async (req, res) => {
 exports.login = async (req, res) => {
   try {
     const { email, password } = req.body;
+    if (!email || !password) {
+      return res.status(400).json({ message: "Email and password required" });
+    }
 
-    const user = await User.findOne({ email });
+    const normalizedEmail = email.toLowerCase().trim();
+    const user = await User.findOne({ email: normalizedEmail });
     if (!user) {
-      return res.status(400).json({ message: "Invalid credentials" });
+      return res.status(401).json({ message: "Invalid credentials" });
     }
 
     const isValid = await bcrypt.compare(password, user.password);
     if (!isValid) {
-      return res.status(400).json({ message: "Invalid credentials" });
+      return res.status(401).json({ message: "Invalid credentials" });
     }
 
-    // 🔐 NEW JWT FORMAT
+    // 🔐 JWT FORMAT
     const token = jwt.sign(
       {
         iss: "devgram",
         sub: user._id.toString(),
         email: user.email,
         username: user.username,
-        name: user.name
+        name: user.name,
       },
       process.env.JWT_SECRET,
       { expiresIn: "7d" }
@@ -97,11 +114,11 @@ exports.login = async (req, res) => {
         id: user._id,
         name: user.name,
         email: user.email,
-        username: user.username
-      }
+        username: user.username,
+      },
     });
   } catch (err) {
-    console.error(err);
+    console.error("Login error:", err);
     res.status(500).json({ message: "Server error" });
   }
 };
@@ -109,9 +126,12 @@ exports.login = async (req, res) => {
 exports.me = async (req, res) => {
   try {
     const user = await User.findById(req.userId).select("-password");
+    if (!user) {
+      return res.status(401).json({ message: "User not found" });
+    }
     res.json(user);
   } catch (err) {
-    console.error(err);
+    console.error("Me error:", err);
     res.status(500).json({ message: "Server error" });
   }
 };
@@ -123,15 +143,16 @@ exports.checkUsername = async (req, res) => {
       return res.status(400).json({ available: false });
     }
 
-    const username = rawUsername.toLowerCase();
+    const username = rawUsername.toLowerCase().trim();
 
-    if (!/^[a-z0-9_.]+$/.test(username)) {
+    if (username.length < 3 || !/^[a-z0-9_.]+$/.test(username)) {
       return res.status(400).json({ available: false });
     }
 
     const exists = await User.findOne({ username });
     res.json({ available: !exists });
-  } catch {
+  } catch (err) {
+    console.error("Check username error:", err);
     res.status(500).json({ available: false });
   }
 };

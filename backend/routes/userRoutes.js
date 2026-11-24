@@ -9,7 +9,7 @@ const {
   updateUserProfile,
   getAllUsers,
   getUserByUsername,
-  searchUsers
+  searchUsers,
 } = require("../controllers/userController");
 
 router.get("/", auth, getAllUsers);
@@ -25,6 +25,6 @@ router.put(
 
 router.put("/:id/follow", auth, toggleFollow);
 
-router.get("/username/:username", getUserByUsername);
+router.get("/username/:username", auth, getUserByUsername);
 
 module.exports = router;

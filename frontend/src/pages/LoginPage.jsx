@@ -1,132 +1,188 @@
-import { useState } from "react";
-import { Link, useNavigate, useLocation } from "react-router-dom";
-import { useAuth } from "../context/AuthContext";
-import api from "../api/axios";
-import { Mail, Lock, Loader2, ArrowRight } from "lucide-react";
+import { useState } from 'react';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
+import api from '../api/axios';
+import toast from 'react-hot-toast';
+import { Mail, Lock, Loader2, ArrowRight, Eye, EyeOff, Sparkles } from 'lucide-react';
 
 const LoginPage = () => {
   const { login } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const redirect = new URLSearchParams(location.search).get("redirect");
 
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  // Redirect destination priority: ProtectedRoute location.state -> search query param -> feed
+  const fromLocation = location.state?.from?.pathname;
+  const searchRedirect = new URLSearchParams(location.search).get('redirect');
+  const destination = fromLocation || searchRedirect || '/';
+
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useState('');
 
-  const submit = async () => {
-    if (!email || !password) {
-      setError("Email and password required");
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+
+    const trimmedEmail = email.trim();
+    if (!trimmedEmail || !password) {
+      const msg = 'Please enter both email and password';
+      setError(msg);
+      toast.error(msg);
       return;
     }
 
     setLoading(true);
-    setError("");
+    setError('');
 
     try {
-      const res = await api.post("/auth/login", { email, password });
-      login(res.data.token);
-      navigate(redirect || "/");
-    } catch {
-      setError("Invalid credentials");
+      const res = await api.post('/auth/login', {
+        email: trimmedEmail,
+        password,
+      });
+
+      if (res.data?.token) {
+        login(res.data.token);
+        toast.success('Welcome back!');
+        navigate(destination, { replace: true });
+      } else {
+        throw new Error('Authentication token not received');
+      }
+    } catch (err) {
+      const errorMsg =
+        err.response?.data?.message ||
+        err.response?.data?.error ||
+        'Invalid email or password. Please try again.';
+      setError(errorMsg);
+      toast.error(errorMsg);
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-4 bg-gradient-to-br from-indigo-50 via-white to-pink-50">
+    <div className="min-h-screen bg-[#0A0F1E] flex items-center justify-center px-4 py-12 relative overflow-hidden">
+      {/* Ambient background glow effects */}
+      <div className="absolute top-1/4 -left-48 w-96 h-96 bg-indigo-600/15 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute bottom-1/4 -right-48 w-96 h-96 bg-violet-600/15 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-indigo-500/[0.04] rounded-full blur-[140px] pointer-events-none" />
 
-      <div className="w-full max-w-md bg-white border border-gray-100 rounded-3xl p-8 shadow-lg">
-
-        {/* LOGO */}
-        <div className="flex justify-center mb-6">
-          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-indigo-600 to-pink-500 flex items-center justify-center text-white font-bold text-lg shadow-md">
+      {/* Main Glass Card */}
+      <div className="w-full max-w-md bg-white/[0.03] backdrop-blur-xl border border-white/[0.06] rounded-3xl p-8 sm:p-10 shadow-2xl relative z-10 transition-all duration-300">
+        {/* Brand / Logo */}
+        <div className="flex flex-col items-center mb-8">
+          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center text-white font-extrabold text-2xl shadow-lg shadow-indigo-500/25 mb-4 ring-1 ring-white/20">
             D
           </div>
-        </div>
-
-        {/* HEADER */}
-        <div className="text-center mb-8">
-          <h2 className="text-2xl font-bold text-slate-900">
-            Welcome back
-          </h2>
-          <p className="text-sm text-slate-500">
-            Login to your Devgram account
+          <h1 className="text-2xl sm:text-3xl font-bold text-white tracking-tight text-center">
+            Welcome back to <span className="bg-gradient-to-r from-indigo-400 to-violet-400 bg-clip-text text-transparent">DevGram</span>
+          </h1>
+          <p className="text-slate-400 text-sm mt-2 text-center">
+            Sign in to connect with fellow engineers and share your work
           </p>
         </div>
 
+        {/* Error Alert Box */}
         {error && (
-          <div className="bg-red-50 border border-red-200 text-red-600 text-sm px-4 py-2 rounded-lg mb-4">
-            {error}
+          <div className="mb-6 p-3.5 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm flex items-center gap-2.5 animate-in fade-in duration-200">
+            <span className="w-1.5 h-1.5 rounded-full bg-red-400 shrink-0" />
+            <span className="flex-1 text-xs sm:text-sm font-medium">{error}</span>
           </div>
         )}
 
-        {/* EMAIL */}
-        <div className="mb-4">
-          <label className="text-sm font-semibold text-slate-700 mb-1 block">
-            Email
-          </label>
-
-          <div className="flex items-center gap-2 border border-gray-200 rounded-xl px-3 py-2">
-            <Mail className="w-4 h-4 text-slate-500" />
-            <input
-              type="email"
-              placeholder="you@example.com"
-              className="flex-1 outline-none text-sm"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-            />
+        {/* Login Form */}
+        <form onSubmit={handleSubmit} className="space-y-5">
+          {/* Email Field */}
+          <div>
+            <label className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2 block">
+              Email Address
+            </label>
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-500">
+                <Mail className="w-4 h-4" />
+              </div>
+              <input
+                type="email"
+                required
+                autoComplete="email"
+                placeholder="developer@example.com"
+                value={email}
+                onChange={(e) => {
+                  setEmail(e.target.value);
+                  if (error) setError('');
+                }}
+                className="w-full bg-white/[0.05] border border-white/[0.1] rounded-xl pl-10 pr-4 py-3 text-white placeholder-slate-500 text-sm focus:outline-none focus:border-indigo-500/50 focus:ring-2 focus:ring-indigo-500/20 transition-all duration-300"
+              />
+            </div>
           </div>
-        </div>
 
-        {/* PASSWORD */}
-        <div className="mb-6">
-          <label className="text-sm font-semibold text-slate-700 mb-1 block">
-            Password
-          </label>
-
-          <div className="flex items-center gap-2 border border-gray-200 rounded-xl px-3 py-2">
-            <Lock className="w-4 h-4 text-slate-500" />
-            <input
-              type="password"
-              placeholder="Enter password"
-              className="flex-1 outline-none text-sm"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && submit()}
-            />
+          {/* Password Field */}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+                Password
+              </label>
+            </div>
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-500">
+                <Lock className="w-4 h-4" />
+              </div>
+              <input
+                type={showPassword ? 'text' : 'password'}
+                required
+                autoComplete="current-password"
+                placeholder="••••••••"
+                value={password}
+                onChange={(e) => {
+                  setPassword(e.target.value);
+                  if (error) setError('');
+                }}
+                className="w-full bg-white/[0.05] border border-white/[0.1] rounded-xl pl-10 pr-11 py-3 text-white placeholder-slate-500 text-sm focus:outline-none focus:border-indigo-500/50 focus:ring-2 focus:ring-indigo-500/20 transition-all duration-300"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-500 hover:text-slate-300 transition-colors focus:outline-none"
+                tabIndex={-1}
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
+              >
+                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
           </div>
-        </div>
 
-        {/* LOGIN BUTTON */}
-        <button
-          onClick={submit}
-          disabled={loading}
-          className="w-full bg-indigo-600 hover:bg-indigo-500 text-white py-3 rounded-xl font-semibold flex items-center justify-center gap-2 transition"
-        >
-          {loading ? (
-            <Loader2 className="w-5 h-5 animate-spin" />
-          ) : (
-            <>
-              Login
-              <ArrowRight className="w-4 h-4" />
-            </>
-          )}
-        </button>
-
-        {/* FOOTER */}
-        <p className="text-center text-sm text-slate-500 mt-6">
-          Don’t have an account?{" "}
-          <Link
-            to="/register"
-            className="text-indigo-600 font-semibold hover:underline"
+          {/* Submit Button */}
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full bg-gradient-to-r from-indigo-500 to-violet-500 hover:from-indigo-600 hover:to-violet-600 text-white font-medium rounded-xl px-6 py-3 transition-all duration-300 hover:shadow-lg hover:shadow-indigo-500/25 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 text-sm mt-2 group"
           >
-            Sign up
-          </Link>
-        </p>
+            {loading ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span>Authenticating...</span>
+              </>
+            ) : (
+              <>
+                <span>Sign In</span>
+                <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
+              </>
+            )}
+          </button>
+        </form>
 
+        {/* Footer Link */}
+        <div className="mt-8 pt-6 border-t border-white/[0.06] text-center">
+          <p className="text-slate-400 text-sm">
+            Don't have an account?{' '}
+            <Link
+              to="/register"
+              className="text-indigo-400 hover:text-indigo-300 font-medium transition-colors hover:underline underline-offset-4"
+            >
+              Create an account
+            </Link>
+          </p>
+        </div>
       </div>
     </div>
   );

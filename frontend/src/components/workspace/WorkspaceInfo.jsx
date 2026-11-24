@@ -1,120 +1,128 @@
+import { useAuth } from "../../context/AuthContext";
 import WorkspaceMembers from "./WorkspaceMembers";
 import InviteMember from "./InviteMember";
-import ChannelManager from "./ChannelManager";
 import {
-  ChevronLeft,
+  X,
   ShieldCheck,
   UserCircle,
-  LayoutGrid,
+  Layout,
   Info,
-  Zap
+  Zap,
+  Users
 } from "lucide-react";
 
-const WorkspaceInfo = ({ workspace, onClose, onChannelCreated }) => {
-  const token = localStorage.getItem("token");
-  const payload = token ? JSON.parse(atob(token.split(".")[1])) : null;
-  const currentUserId = payload?.id || payload?._id || payload?.sub || null;
+const WorkspaceInfo = ({ workspace, onClose, onWorkspaceUpdated }) => {
+  const { user: authUser, token } = useAuth();
 
-  const myMember = workspace.members.find(
-    m => (m.user?._id || m.user) === currentUserId
+  const user = authUser || (() => {
+    if (!token) return null;
+    try {
+      const payload = JSON.parse(atob(token.split(".")[1]));
+      return { id: payload.sub || payload.id || payload._id, ...payload };
+    } catch {
+      return null;
+    }
+  })();
+
+  const currentUserId = user?.id || user?._id;
+
+  const myMember = workspace?.members?.find(
+    (m) => String(m.user?._id || m.user) === String(currentUserId)
   );
 
-  const myRole = myMember?.role;
+  const myRole = myMember?.role || "member";
   const isOwner = myRole === "owner";
   const isAdmin = myRole === "admin";
 
   return (
-    <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex justify-end z-[80]">
-
-      {/* PANEL */}
-      <div className="w-full sm:w-[460px] bg-white h-full shadow-2xl border-l border-slate-200 flex flex-col overflow-hidden">
-
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex justify-end z-[80] transition-opacity animate-in fade-in duration-200">
+      {/* SLIDE-OVER PANEL */}
+      <div className="w-full sm:w-[460px] bg-[#0A0F1E] h-full shadow-2xl border-l border-white/[0.06] flex flex-col overflow-hidden text-white animate-in slide-in-from-right duration-300">
         {/* HEADER */}
-        <div className="px-6 py-5 flex items-center justify-between border-b border-slate-200 bg-white">
-          <button
-            onClick={onClose}
-            className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-slate-500 hover:text-slate-900 transition"
-          >
-            <ChevronLeft className="w-4 h-4" />
-            Back
-          </button>
-
-          <div className="flex items-center gap-2 bg-indigo-50 border border-indigo-200 px-3 py-1 rounded-lg">
-            <ShieldCheck className="w-4 h-4 text-indigo-600" />
-            <span className="text-[10px] font-bold text-indigo-600 uppercase tracking-widest">
-              {myRole || "Member"}
+        <div className="px-6 py-5 flex items-center justify-between border-b border-white/[0.06] bg-white/[0.02]">
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-400">
+              Workspace Overview
             </span>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1.5 bg-indigo-500/10 border border-indigo-500/20 px-2.5 py-1 rounded-full">
+              <ShieldCheck className="w-3.5 h-3.5 text-indigo-400" />
+              <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-wider">
+                {myRole}
+              </span>
+            </div>
+
+            <button
+              onClick={onClose}
+              className="p-1.5 rounded-lg hover:bg-white/[0.05] text-slate-400 hover:text-white transition"
+            >
+              <X className="w-5 h-5" />
+            </button>
           </div>
         </div>
 
         {/* CONTENT */}
-        <div className="flex-1 overflow-y-auto bg-slate-50">
-
-          {/* HERO */}
-          <div className="px-8 py-10 border-b border-slate-200">
-            <div className="w-16 h-16 bg-indigo-600 rounded-xl flex items-center justify-center text-2xl font-bold text-white mb-6 shadow-md">
-              {workspace.name.charAt(0).toUpperCase()}
+        <div className="flex-1 overflow-y-auto">
+          {/* HERO CARD */}
+          <div className="p-6 border-b border-white/[0.06] bg-white/[0.01]">
+            <div className="w-14 h-14 bg-gradient-to-br from-indigo-500 to-violet-500 rounded-2xl flex items-center justify-center text-xl font-extrabold text-white mb-4 shadow-lg shadow-indigo-500/20">
+              {workspace?.name?.charAt(0).toUpperCase() || "W"}
             </div>
 
-            <h3 className="text-2xl font-bold text-slate-900 mb-3">
-              {workspace.name}
+            <h3 className="text-xl font-bold text-white mb-2">
+              {workspace?.name}
             </h3>
 
-            <div className="flex items-start gap-3 p-4 bg-white rounded-xl border border-slate-200">
-              <Info className="w-5 h-5 text-indigo-500 mt-0.5" />
-              <p className="text-sm text-slate-600">
-                {workspace.description ||
-                  "A collaborative workspace for your team and projects."}
+            <div className="flex items-start gap-3 p-3.5 bg-white/[0.03] rounded-xl border border-white/[0.06]">
+              <Info className="w-4 h-4 text-indigo-400 mt-0.5 shrink-0" />
+              <p className="text-xs text-slate-300 leading-relaxed">
+                {workspace?.description ||
+                  "A collaborative workspace for your team, channels, and projects."}
               </p>
             </div>
           </div>
 
-          <div className="p-8 space-y-10">
-
-            {/* INVITE */}
+          <div className="p-6 space-y-8">
+            {/* INVITE MEMBERS SECTION (FOR OWNER/ADMIN) */}
             {(isOwner || isAdmin) && (
               <section className="space-y-3">
-                <div className="flex items-center gap-2">
-                  <Zap className="w-4 h-4 text-emerald-500" />
-                  <h4 className="text-xs font-bold text-slate-500 uppercase tracking-widest">
-                    Invite Members
-                  </h4>
+                <div className="flex items-center gap-2 text-indigo-400 text-xs font-bold uppercase tracking-wider">
+                  <Zap className="w-4 h-4 text-emerald-400" />
+                  <span>Invite Teammates</span>
                 </div>
 
-                <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
+                <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-4 shadow-sm">
                   <InviteMember workspaceId={workspace._id} />
                 </div>
               </section>
             )}
 
-            {/* MEMBERS */}
+            {/* MEMBERS ROSTER SECTION */}
             <section className="space-y-3">
-              <div className="flex items-center justify-between border-b border-slate-200 pb-3">
-                <div className="flex items-center gap-2">
-                  <UserCircle className="w-4 h-4 text-indigo-500" />
-                  <h4 className="text-xs font-bold text-slate-600 uppercase tracking-widest">
-                    Members
-                  </h4>
+              <div className="flex items-center justify-between pb-1">
+                <div className="flex items-center gap-2 text-indigo-400 text-xs font-bold uppercase tracking-wider">
+                  <Users className="w-4 h-4" />
+                  <span>Workspace Members</span>
                 </div>
 
-                <span className="text-xs text-slate-500 bg-slate-100 px-3 py-1 rounded-full">
-                  {workspace.members.length}
+                <span className="text-xs text-slate-400 bg-white/[0.04] border border-white/[0.06] px-2.5 py-0.5 rounded-full">
+                  {workspace?.members?.length || 0}
                 </span>
               </div>
 
-              <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+              <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl overflow-hidden p-2">
                 <WorkspaceMembers
                   workspace={workspace}
                   currentUserId={currentUserId}
                   myRole={myRole}
+                  onMemberChange={onWorkspaceUpdated}
                 />
               </div>
             </section>
           </div>
         </div>
-
-        {/* FOOTER */}
-        
       </div>
     </div>
   );

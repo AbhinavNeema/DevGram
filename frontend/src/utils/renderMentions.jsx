@@ -3,8 +3,11 @@ import { Link } from "react-router-dom";
 export const renderMentions = (text, mentions = []) => {
   if (!text) return null;
 
+  if (!mentions || !Array.isArray(mentions)) return text;
+
   const map = {};
   mentions.forEach(u => {
+    if (!u || !u.username) return;
     map[u.username] = u._id;
   });
 

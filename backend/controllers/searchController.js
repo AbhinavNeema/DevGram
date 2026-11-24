@@ -8,7 +8,8 @@ exports.search = async (req, res) => {
     const q = req.query.q?.trim();
     if (!q) return res.json({ users: [], projects: [] });
 
-    const regex = new RegExp(q, "i");
+    const escaped = q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const regex = new RegExp(escaped, "i");
 
     // 1️⃣ User search (keep regex for usernames)
     const users = await User.find({

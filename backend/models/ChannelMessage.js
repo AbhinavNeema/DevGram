@@ -14,7 +14,7 @@ const channelMessageSchema = new mongoose.Schema(
     },
     type: {
       type: String,
-      enum: ["text", "image", "file"],
+      enum: ["text", "image", "file", "system"],
       default: "text",
     },
     content: {
@@ -23,7 +23,7 @@ const channelMessageSchema = new mongoose.Schema(
         return this.type !== "system";
       },
     },
-     fileMeta: {
+    fileMeta: {
       name: String,
       size: Number,
       mime: String,

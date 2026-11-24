@@ -4,6 +4,7 @@ const ctrl = require("../controllers/workspaceController");
 
 router.post("/", auth, ctrl.createWorkspace);
 router.get("/", auth, ctrl.getMyWorkspaces);
+router.post("/accept-token", auth, ctrl.acceptInviteByToken);
 
 // ✅ single, consistent param
 router.get("/:workspaceId", auth, ctrl.getWorkspaceById);
@@ -15,4 +16,5 @@ router.delete(
   auth,
   ctrl.removeMember
 );
+
 module.exports = router;
